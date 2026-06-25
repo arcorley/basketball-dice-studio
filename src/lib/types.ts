@@ -547,10 +547,48 @@ export interface GameResult {
   playedAt: string;
 }
 
+export interface RollTraceStep {
+  label: string;
+  roll?: number;
+  target?: number;
+  result: string;
+  detail?: string;
+}
+
+export interface PossessionTrace {
+  id: string;
+  periodIndex: number;
+  periodLabel: string;
+  possessionNumber: number;
+  side: "away" | "home";
+  offenseTeamId: string;
+  defenseTeamId: string;
+  startScore: {
+    away: number;
+    home: number;
+  };
+  endScore: {
+    away: number;
+    home: number;
+  };
+  points: number;
+  summary: string;
+  steps: RollTraceStep[];
+}
+
+export interface TracedGameResult {
+  seed: number;
+  result: GameResult;
+  possessions: PossessionTrace[];
+}
+
 export interface LeagueGame {
   id: string;
   awayTeamId: string;
   homeTeamId: string;
+  date?: string;
+  round?: number;
+  sequence?: number;
   status: "unplayed" | "simulated" | "manual";
   result?: GameResult;
 }

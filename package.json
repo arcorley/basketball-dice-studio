@@ -1,12 +1,25 @@
 {
   "name": "basketball-dice-studio",
   "version": "0.6.0",
+  "description": "Local-first tabletop basketball dice game studio.",
   "private": true,
   "type": "module",
+  "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "tsc && vite build",
     "preview": "vite preview --host 127.0.0.1",
+    "desktop:dev": "node scripts/electron-dev.mjs",
+    "desktop:pack": "npm run build && electron-builder --dir",
+    "desktop:dist": "npm run build && electron-builder",
+    "desktop:dist:mac": "npm run build && electron-builder --mac",
+    "desktop:dist:win": "npm run build && electron-builder --win",
+    "desktop:dist:linux": "npm run build && electron-builder --linux",
+    "release:build": "node scripts/build-release.mjs",
+    "release:build:mac": "node scripts/build-release.mjs mac",
+    "release:build:win": "node scripts/build-release.mjs win",
+    "release:build:linux": "node scripts/build-release.mjs linux",
+    "release:github": "node scripts/create-github-release.mjs",
     "discover:data": "node scripts/discover-bbr-manifest.mjs",
     "fetch:data": "node scripts/fetch-bbr-data.mjs",
     "data:discover": "npm run discover:data -- --start-year=1990 --end-year=2025 --use-cache",
@@ -19,19 +32,67 @@
     "simulate:2021-season": "tsx scripts/simulate-2021-season.ts",
     "simulate:2021-season:direct": "tsx scripts/simulate-2021-season-direct.ts"
   },
-  "dependencies": {
+  "devDependencies": {
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.2",
+    "electron": "^42.5.0",
+    "electron-builder": "^26.15.3",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
     "lucide-react": "^0.562.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
+    "tesseract.js": "^7.0.0",
+    "tsx": "^4.22.4",
     "typescript": "^5.9.3",
-    "vite": "^7.2.7"
+    "vite": "^7.2.7",
+    "xlsx": "^0.18.5"
   },
-  "devDependencies": {
-    "@types/react": "^19.2.17",
-    "@types/react-dom": "^19.2.3",
-    "tsx": "^4.22.4"
+  "build": {
+    "appId": "com.basketballdicestudio.app",
+    "productName": "Basketball Dice Studio",
+    "artifactName": "Basketball-Dice-Studio-${version}-${os}-${arch}.${ext}",
+    "asar": true,
+    "npmRebuild": false,
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json",
+      "!node_modules/**/*"
+    ],
+    "mac": {
+      "category": "public.app-category.games",
+      "identity": null,
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "zip"
+      ]
+    },
+    "linux": {
+      "category": "Game",
+      "maintainer": "Basketball Dice Studio",
+      "target": [
+        "AppImage",
+        "deb",
+        "tar.gz"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
   }
 }

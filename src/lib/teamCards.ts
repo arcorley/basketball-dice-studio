@@ -526,7 +526,7 @@ export function buildDiceTeamCards(sourceTeams: SourceTeam[], leagues: SourceLea
   });
 }
 
-export const derivationNotes = [
+export const generalDerivationNotes = [
   "Team modifiers use full Basketball Reference league distributions for that team season, not the current app library average.",
   "Player impact uses season-level Basketball Reference player advanced distributions for OBPM, DBPM, BPM, usage, TS%, assist, rebound, steal, block, turnover, and FTA/FGA context.",
   "Individual players drive possession usage and action ranges through sourced season contribution per team game, usage context, makes, attempts, FTA/FGA, drawn shooting fouls when Basketball Reference provides them, TOV%, per-100 stats, assists, rebounds, steals, blocks, and fouls.",
@@ -549,3 +549,9 @@ export const derivationNotes = [
   "SRS, margin context through league distributions, offensive rating, defensive rating, eFG%, turnovers, rebounding, and 3PA rate all contribute to static card modifiers.",
   "Team-level matchup modifiers are preserved as decimal values in the simulator and rounded only when converted into printable d100 ranges."
 ];
+
+export const teamDerivationNotes: Record<string, string[]> = {
+  // Add team/year-specific derivation nuances keyed by DiceTeamCard.id, e.g. "1993-94-hou".
+};
+
+export const derivationNotes = generalDerivationNotes;

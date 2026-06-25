@@ -7,14 +7,17 @@ import type {
   MatchupCard,
   MatchupOptions,
   PlayerRangeRow,
+  PossessionTrace,
   RangeRow,
+  RollTraceStep,
   ShotLocationProfileMethod,
   ShotZone,
   SourcePlayer,
   SourceShotLocationProfile,
   SourcePlayerPostseasonProfile,
   StatLine,
-  TeamMatchupStatic
+  TeamMatchupStatic,
+  TracedGameResult
 } from "./types";
 import { SeededRandom } from "./random";
 import { calibration as cardCalibration } from "./teamCards";
@@ -91,8 +94,43 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-function pctRoll(rng: SeededRandom, chance: number): boolean {
-  return rng.next() * 100 < chance;
+function roundedRoll(value: number): number {
+  return Number(value.toFixed(1));
+}
+
+function percentRoll(rng: SeededRandom, chance: number): { roll: number; target: number; success: boolean } {
+  const roll = rng.next() * 100;
+  return {
+    roll,
+    target: chance,
+    success: roll < chance
+  };
+}
+
+function addTraceStep(trace: PossessionTrace | undefined, step: RollTraceStep): void {
+  if (!trace) return;
+  trace.steps.push({
+    ...step,
+    roll: step.roll === undefined ? undefined : roundedRoll(step.roll),
+    target: step.target === undefined ? undefined : roundedRoll(step.target)
+  });
+}
+
+function successLabel(success: boolean, yes = "Yes", no = "No"): string {
+  return success ? yes : no;
+}
+
+function shotZoneLabel(zone: ShotZone): string {
+  switch (zone) {
+    case "rim":
+      return "Rim";
+    case "shortMid":
+      return "Short 2";
+    case "longMid":
+      return "Long 2";
+    case "three":
+      return "3P";
+  }
 }
 
 function safeRange(start: number, end: number): string {
@@ -786,13 +824,14 @@ function matchupOffensiveReboundChances(offense: DiceTeamCard, defense: DiceTeam
   ) as Record<ShotZone, number>;
 }
 
-function chooseShotZone(chances: Record<ShotZone, number>, rng: SeededRandom): ShotZone {
+function chooseShotZoneResult(chances: Record<ShotZone, number>, rng: SeededRandom): { zone: ShotZone; roll: number } {
   let roll = rng.next() * 100;
+  const originalRoll = roll;
   for (const zone of shotZones) {
     roll -= chances[zone];
-    if (roll <= 0) return zone;
+    if (roll <= 0) return { zone, roll: originalRoll };
   }
-  return "three";
+  return { zone: "three", roll: originalRoll };
 }
 
 function assignmentWeight(team: DiceTeamCard, player: DicePlayerCard, event: AssignmentEvent, options: MatchupOptions): number {
@@ -1013,30 +1052,38 @@ export function buildMatchupCard(away: DiceTeamCard, home: DiceTeamCard, options
   };
 }
 
-function weightedChoice(team: DiceTeamCard, event: AssignmentEvent, options: MatchupOptions, rng: SeededRandom, excludeName = ""): DicePlayerCard | undefined {
+function weightedChoiceResult(
+  team: DiceTeamCard,
+  event: AssignmentEvent,
+  options: MatchupOptions,
+  rng: SeededRandom,
+  excludeName = ""
+): { player: DicePlayerCard | undefined; roll: number; total: number } {
   const items = team.players
     .filter((player) => player.name !== excludeName)
     .map((player) => ({ player, weight: assignmentWeight(team, player, event, options) }))
     .filter((item) => item.weight > 0);
   const total = items.reduce((sum, item) => sum + item.weight, 0);
-  if (total <= 0) return undefined;
+  if (total <= 0) return { player: undefined, roll: 0, total: 0 };
 
   let roll = rng.next() * total;
+  const originalRoll = roll;
   for (const item of items) {
     roll -= item.weight;
-    if (roll <= 0) return item.player;
+    if (roll <= 0) return { player: item.player, roll: originalRoll, total };
   }
-  return items.at(-1)?.player;
+  return { player: items.at(-1)?.player, roll: originalRoll, total };
 }
 
-function selectOffensivePlayer(team: DiceTeamCard, options: MatchupOptions, rng: SeededRandom): DicePlayerCard {
+function selectOffensivePlayerResult(team: DiceTeamCard, options: MatchupOptions, rng: SeededRandom): { player: DicePlayerCard; roll: number; total: number } {
   const total = team.players.reduce((sum, player) => sum + contextualUseWeight(team, player, options), 0);
   let roll = rng.next() * total;
+  const originalRoll = roll;
   for (const player of team.players) {
     roll -= contextualUseWeight(team, player, options);
-    if (roll <= 0) return player;
+    if (roll <= 0) return { player, roll: originalRoll, total };
   }
-  return team.players.at(-1) as DicePlayerCard;
+  return { player: team.players.at(-1) as DicePlayerCard, roll: originalRoll, total };
 }
 
 function emptyTeamStats(): StatLine {
@@ -1060,47 +1107,116 @@ function resolvePossession(
   defensePlayerStats: Record<string, StatLine>,
   offenseTeamStats: StatLine,
   defenseTeamStats: StatLine,
-  rng: SeededRandom
+  rng: SeededRandom,
+  trace?: PossessionTrace
 ): void {
   add(offenseTeamStats, "poss");
   let extensions = 0;
 
   while (true) {
-    if (simParams.nonshootFoulChance > 0 && pctRoll(rng, simParams.nonshootFoulChance)) {
-      const fouler = weightedChoice(defense, "PF", options, rng);
-      if (fouler) {
-        add(defensePlayerStats[fouler.name], "PF");
-        add(defenseTeamStats, "PF");
-        add(offenseTeamStats, "nonshooting_fouls_drawn");
+    if (simParams.nonshootFoulChance > 0) {
+      const looseFoul = percentRoll(rng, simParams.nonshootFoulChance);
+      addTraceStep(trace, {
+        label: "Loose foul check",
+        roll: looseFoul.roll,
+        target: looseFoul.target,
+        result: successLabel(looseFoul.success),
+        detail: `${defense.shortName} non-shooting foul range`
+      });
+      if (looseFoul.success) {
+        const foulChoice = weightedChoiceResult(defense, "PF", options, rng);
+        const fouler = foulChoice.player;
+        addTraceStep(trace, {
+          label: "Personal foul assignment",
+          roll: foulChoice.roll,
+          target: foulChoice.total,
+          result: fouler?.name ?? "No assignment",
+          detail: "PF assignment table"
+        });
+        if (fouler) {
+          add(defensePlayerStats[fouler.name], "PF");
+          add(defenseTeamStats, "PF");
+          add(offenseTeamStats, "nonshooting_fouls_drawn");
+        }
       }
     }
 
-    const shooter = selectOffensivePlayer(offense, options, rng);
+    const shooterChoice = selectOffensivePlayerResult(offense, options, rng);
+    const shooter = shooterChoice.player;
+    addTraceStep(trace, {
+      label: "Usage assignment",
+      roll: shooterChoice.roll,
+      target: shooterChoice.total,
+      result: shooter.name,
+      detail: `${offense.shortName} use table`
+    });
     const shooterProfile = matchupPlayerProfile(offense, defense, shooter, options);
     const effectiveTov = effectiveTurnoverChance(offense, defense, options, shooterProfile);
     const effectiveFd = effectiveFoulDrawChance(offense, defense, options, shooterProfile);
     const actionRoll = rng.next() * 100;
+    const actionResult = actionRoll < effectiveTov ? "Turnover" : actionRoll < effectiveTov + effectiveFd ? "Foul draw" : "Shot";
+    addTraceStep(trace, {
+      label: "Action roll",
+      roll: actionRoll,
+      target: actionResult === "Turnover" ? effectiveTov : actionResult === "Foul draw" ? effectiveTov + effectiveFd : 100,
+      result: actionResult,
+      detail: `${shooter.name}: TOV ${effectiveTov.toFixed(1)}, foul ${effectiveFd.toFixed(1)}, shot ${(100 - effectiveTov - effectiveFd).toFixed(1)}`
+    });
 
     if (actionRoll < effectiveTov) {
       add(offensePlayerStats[shooter.name], "TOV");
       add(offenseTeamStats, "TOV");
-      if (pctRoll(rng, shooterProfile.offensiveFoulTurnoverChance)) {
+      const offensiveFoul = percentRoll(rng, shooterProfile.offensiveFoulTurnoverChance);
+      addTraceStep(trace, {
+        label: "Offensive foul turnover",
+        roll: offensiveFoul.roll,
+        target: offensiveFoul.target,
+        result: successLabel(offensiveFoul.success),
+        detail: shooter.name
+      });
+      if (offensiveFoul.success) {
         add(offensePlayerStats[shooter.name], "PF");
         add(offenseTeamStats, "PF");
+        if (trace) trace.summary = `${offense.shortName} turnover, offensive foul on ${shooter.name}`;
         return;
       }
-      if (pctRoll(rng, shooterProfile.liveBallTurnoverChance)) {
-        const stealer = weightedChoice(defense, "STL", options, rng);
+      const liveBall = percentRoll(rng, shooterProfile.liveBallTurnoverChance);
+      addTraceStep(trace, {
+        label: "Live-ball turnover",
+        roll: liveBall.roll,
+        target: liveBall.target,
+        result: successLabel(liveBall.success),
+        detail: shooter.name
+      });
+      if (liveBall.success) {
+        const stealChoice = weightedChoiceResult(defense, "STL", options, rng);
+        const stealer = stealChoice.player;
+        addTraceStep(trace, {
+          label: "Steal assignment",
+          roll: stealChoice.roll,
+          target: stealChoice.total,
+          result: stealer?.name ?? "No assignment",
+          detail: `${defense.shortName} STL table`
+        });
         if (stealer) {
           add(defensePlayerStats[stealer.name], "STL");
           add(defenseTeamStats, "STL");
         }
       }
+      if (trace) trace.summary = `${offense.shortName} turnover by ${shooter.name}`;
       return;
     }
 
     if (actionRoll < effectiveTov + effectiveFd) {
-      const fouler = weightedChoice(defense, "ShootingPF", options, rng);
+      const foulChoice = weightedChoiceResult(defense, "ShootingPF", options, rng);
+      const fouler = foulChoice.player;
+      addTraceStep(trace, {
+        label: "Shooting foul assignment",
+        roll: foulChoice.roll,
+        target: foulChoice.total,
+        result: fouler?.name ?? "No assignment",
+        detail: `${defense.shortName} shooting PF table`
+      });
       if (fouler) {
         add(defensePlayerStats[fouler.name], "PF");
         add(defenseTeamStats, "PF");
@@ -1108,7 +1224,15 @@ function resolvePossession(
       for (let shot = 0; shot < 2; shot += 1) {
         add(offensePlayerStats[shooter.name], "FTA");
         add(offenseTeamStats, "FTA");
-        if (pctRoll(rng, shooterProfile.ft)) {
+        const freeThrow = percentRoll(rng, shooterProfile.ft);
+        addTraceStep(trace, {
+          label: `Free throw ${shot + 1}`,
+          roll: freeThrow.roll,
+          target: freeThrow.target,
+          result: successLabel(freeThrow.success, "Made", "Miss"),
+          detail: shooter.name
+        });
+        if (freeThrow.success) {
           add(offensePlayerStats[shooter.name], "FTM");
           add(offensePlayerStats[shooter.name], "PTS");
           add(offenseTeamStats, "FTM");
@@ -1116,17 +1240,46 @@ function resolvePossession(
         }
       }
 
-      if (pctRoll(rng, foulEndsPossessionChance(offense))) {
+      const foulEnds = percentRoll(rng, foulEndsPossessionChance(offense));
+      addTraceStep(trace, {
+        label: "Foul ends possession",
+        roll: foulEnds.roll,
+        target: foulEnds.target,
+        result: successLabel(foulEnds.success),
+        detail: `${offense.shortName} foul-end range`
+      });
+      if (foulEnds.success) {
+        if (trace) trace.summary = `${offense.shortName} shooting foul trip for ${shooter.name}`;
         return;
       }
       add(offenseTeamStats, "continuation_fouls_drawn");
     }
 
-    const shotTaker = actionRoll < effectiveTov + effectiveFd ? selectOffensivePlayer(offense, options, rng) : shooter;
+    let shotTaker = shooter;
+    if (actionRoll < effectiveTov + effectiveFd) {
+      const continuationChoice = selectOffensivePlayerResult(offense, options, rng);
+      shotTaker = continuationChoice.player;
+      addTraceStep(trace, {
+        label: "Continuation usage",
+        roll: continuationChoice.roll,
+        target: continuationChoice.total,
+        result: shotTaker.name,
+        detail: `${offense.shortName} use table`
+      });
+    }
     const shotProfile = shotTaker.id === shooter.id ? shooterProfile : matchupPlayerProfile(offense, defense, shotTaker, options);
-    const shotZone = chooseShotZone(effectiveShotZoneChances(offense, defense, options, shotProfile), rng);
+    const zoneChances = effectiveShotZoneChances(offense, defense, options, shotProfile);
+    const zoneChoice = chooseShotZoneResult(zoneChances, rng);
+    const shotZone = zoneChoice.zone;
     const isThree = shotZone === "three";
     const makeNumber = clamp(shotProfile.shotMakes[shotZone] + offenseStatic.totalShotAdjustment, 1, 99);
+    addTraceStep(trace, {
+      label: "Shot zone",
+      roll: zoneChoice.roll,
+      target: 100,
+      result: shotZoneLabel(shotZone),
+      detail: `${shotTaker.name}: rim ${zoneChances.rim.toFixed(1)}, short ${zoneChances.shortMid.toFixed(1)}, long ${zoneChances.longMid.toFixed(1)}, 3P ${zoneChances.three.toFixed(1)}`
+    });
 
     add(offensePlayerStats[shotTaker.name], "FGA");
     add(offenseTeamStats, "FGA");
@@ -1135,7 +1288,15 @@ function resolvePossession(
       add(offenseTeamStats, "3PA");
     }
 
-    if (pctRoll(rng, makeNumber)) {
+    const shotMake = percentRoll(rng, makeNumber);
+    addTraceStep(trace, {
+      label: "Shot make",
+      roll: shotMake.roll,
+      target: shotMake.target,
+      result: successLabel(shotMake.success, "Made", "Miss"),
+      detail: `${shotTaker.name} ${shotZoneLabel(shotZone)}`
+    });
+    if (shotMake.success) {
       add(offensePlayerStats[shotTaker.name], "FGM");
       add(offenseTeamStats, "FGM");
       if (isThree) {
@@ -1149,55 +1310,140 @@ function resolvePossession(
       }
 
       const assistChance = isThree ? offense.assistMade3 : offense.assistMade2;
-      if (pctRoll(rng, clamp(assistChance + simParams.astMod, 0, 95))) {
-        const passer = weightedChoice(offense, "AST", options, rng, shotTaker.name);
+      const assist = percentRoll(rng, clamp(assistChance + simParams.astMod, 0, 95));
+      addTraceStep(trace, {
+        label: "Assist check",
+        roll: assist.roll,
+        target: assist.target,
+        result: successLabel(assist.success),
+        detail: isThree ? "Made 3P assist range" : "Made 2P assist range"
+      });
+      if (assist.success) {
+        const assistChoice = weightedChoiceResult(offense, "AST", options, rng, shotTaker.name);
+        const passer = assistChoice.player;
+        addTraceStep(trace, {
+          label: "Assist assignment",
+          roll: assistChoice.roll,
+          target: assistChoice.total,
+          result: passer?.name ?? "No assignment",
+          detail: `${offense.shortName} AST table`
+        });
         if (passer) {
           add(offensePlayerStats[passer.name], "AST");
           add(offenseTeamStats, "AST");
         }
       }
-      if (pctRoll(rng, shotProfile.andOneChance)) {
-        const fouler = weightedChoice(defense, "ShootingPF", options, rng);
+      const andOne = percentRoll(rng, shotProfile.andOneChance);
+      addTraceStep(trace, {
+        label: "And-one check",
+        roll: andOne.roll,
+        target: andOne.target,
+        result: successLabel(andOne.success),
+        detail: shotTaker.name
+      });
+      if (andOne.success) {
+        const foulChoice = weightedChoiceResult(defense, "ShootingPF", options, rng);
+        const fouler = foulChoice.player;
+        addTraceStep(trace, {
+          label: "And-one foul assignment",
+          roll: foulChoice.roll,
+          target: foulChoice.total,
+          result: fouler?.name ?? "No assignment",
+          detail: `${defense.shortName} shooting PF table`
+        });
         if (fouler) {
           add(defensePlayerStats[fouler.name], "PF");
           add(defenseTeamStats, "PF");
         }
         add(offensePlayerStats[shotTaker.name], "FTA");
         add(offenseTeamStats, "FTA");
-        if (pctRoll(rng, shotProfile.ft)) {
+        const freeThrow = percentRoll(rng, shotProfile.ft);
+        addTraceStep(trace, {
+          label: "And-one free throw",
+          roll: freeThrow.roll,
+          target: freeThrow.target,
+          result: successLabel(freeThrow.success, "Made", "Miss"),
+          detail: shotTaker.name
+        });
+        if (freeThrow.success) {
           add(offensePlayerStats[shotTaker.name], "FTM");
           add(offensePlayerStats[shotTaker.name], "PTS");
           add(offenseTeamStats, "FTM");
           add(offenseTeamStats, "PTS");
         }
       }
+      if (trace) trace.summary = `${offense.shortName} ${shotTaker.name} made ${isThree ? "a 3" : "a 2"}`;
       return;
     }
 
-    if (!isThree && pctRoll(rng, clamp(simParams.blockBase + defense.defense, 0, 40))) {
-      const blocker = weightedChoice(defense, "BLK", options, rng);
-      if (blocker) {
-        add(defensePlayerStats[blocker.name], "BLK");
-        add(defenseTeamStats, "BLK");
+    if (!isThree) {
+      const block = percentRoll(rng, clamp(simParams.blockBase + defense.defense, 0, 40));
+      addTraceStep(trace, {
+        label: "Block check",
+        roll: block.roll,
+        target: block.target,
+        result: successLabel(block.success),
+        detail: `${defense.shortName} block range`
+      });
+      if (block.success) {
+        const blockChoice = weightedChoiceResult(defense, "BLK", options, rng);
+        const blocker = blockChoice.player;
+        addTraceStep(trace, {
+          label: "Block assignment",
+          roll: blockChoice.roll,
+          target: blockChoice.total,
+          result: blocker?.name ?? "No assignment",
+          detail: `${defense.shortName} BLK table`
+        });
+        if (blocker) {
+          add(defensePlayerStats[blocker.name], "BLK");
+          add(defenseTeamStats, "BLK");
+        }
       }
     }
 
     const orbChance = offenseStatic.orbByShotZone[shotZone];
-    if (pctRoll(rng, orbChance) && extensions < simParams.maxOrbExtensions) {
-      const rebounder = weightedChoice(offense, "OREB", options, rng);
+    const offensiveRebound = percentRoll(rng, orbChance);
+    addTraceStep(trace, {
+      label: "Offensive rebound check",
+      roll: offensiveRebound.roll,
+      target: offensiveRebound.target,
+      result: offensiveRebound.success && extensions < simParams.maxOrbExtensions ? "Yes" : "No",
+      detail: extensions >= simParams.maxOrbExtensions ? "Extension limit reached" : `${shotZoneLabel(shotZone)} rebound range`
+    });
+    if (offensiveRebound.success && extensions < simParams.maxOrbExtensions) {
+      const reboundChoice = weightedChoiceResult(offense, "OREB", options, rng);
+      const rebounder = reboundChoice.player;
+      addTraceStep(trace, {
+        label: "Offensive rebound assignment",
+        roll: reboundChoice.roll,
+        target: reboundChoice.total,
+        result: rebounder?.name ?? "No assignment",
+        detail: `${offense.shortName} OREB table`
+      });
       if (rebounder) {
         add(offensePlayerStats[rebounder.name], "OREB");
         add(offenseTeamStats, "OREB");
       }
       extensions += 1;
+      if (trace) trace.summary = `${offense.shortName} missed, offensive rebound`;
       continue;
     }
 
-    const rebounder = weightedChoice(defense, "DREB", options, rng);
+    const reboundChoice = weightedChoiceResult(defense, "DREB", options, rng);
+    const rebounder = reboundChoice.player;
+    addTraceStep(trace, {
+      label: "Defensive rebound assignment",
+      roll: reboundChoice.roll,
+      target: reboundChoice.total,
+      result: rebounder?.name ?? "No assignment",
+      detail: `${defense.shortName} DREB table`
+    });
     if (rebounder) {
       add(defensePlayerStats[rebounder.name], "DREB");
       add(defenseTeamStats, "DREB");
     }
+    if (trace) trace.summary = `${offense.shortName} ${shotTaker.name} missed ${shotZoneLabel(shotZone)}`;
     return;
   }
 }
@@ -1208,13 +1454,18 @@ function finalizePlayerStats(stats: Record<string, StatLine>): void {
   }
 }
 
-export function simulateGame(
+function periodLabel(periodIndex: number): string {
+  return periodIndex < 4 ? `Q${periodIndex + 1}` : `OT${periodIndex - 3}`;
+}
+
+function simulateGameInternal(
   away: DiceTeamCard,
   home: DiceTeamCard,
-  seed = Date.now(),
-  source: "simulated" | "manual" = "simulated",
-  options: Partial<MatchupOptions> = defaultMatchupOptions
-): GameResult {
+  seed: number,
+  source: "simulated" | "manual",
+  options: Partial<MatchupOptions>,
+  collectTrace: boolean
+): TracedGameResult {
   const rng = new SeededRandom(seed);
   const matchupOptions = normalizeMatchupOptions(options);
   const matchup = buildMatchupCard(away, home, matchupOptions);
@@ -1223,13 +1474,77 @@ export function simulateGame(
   const awayPlayerStats = emptyPlayerStats(away);
   const homePlayerStats = emptyPlayerStats(home);
   const quarters: Array<{ away: number; home: number }> = [];
+  const possessions: PossessionTrace[] = [];
+  let possessionNumber = 0;
 
-  for (const possessions of matchup.quarters) {
+  const playPossession = (
+    periodIndex: number,
+    possessionInPeriod: number,
+    side: "away" | "home",
+    offense: DiceTeamCard,
+    defense: DiceTeamCard,
+    offenseStatic: TeamMatchupStatic,
+    offensePlayerStats: Record<string, StatLine>,
+    defensePlayerStats: Record<string, StatLine>,
+    offenseTeamStats: StatLine,
+    defenseTeamStats: StatLine
+  ) => {
+    const offensePointsBefore = offenseTeamStats.PTS;
+    const trace = collectTrace
+      ? ({
+          id: `${periodLabel(periodIndex)}-${possessionInPeriod + 1}-${side}`,
+          periodIndex,
+          periodLabel: periodLabel(periodIndex),
+          possessionNumber: possessionNumber + 1,
+          side,
+          offenseTeamId: offense.id,
+          defenseTeamId: defense.id,
+          startScore: {
+            away: awayTeamStats.PTS,
+            home: homeTeamStats.PTS
+          },
+          endScore: {
+            away: awayTeamStats.PTS,
+            home: homeTeamStats.PTS
+          },
+          points: 0,
+          summary: "",
+          steps: []
+        } satisfies PossessionTrace)
+      : undefined;
+
+    possessionNumber += 1;
+    resolvePossession(
+      offense,
+      defense,
+      offenseStatic,
+      matchupOptions,
+      offensePlayerStats,
+      defensePlayerStats,
+      offenseTeamStats,
+      defenseTeamStats,
+      rng,
+      trace
+    );
+
+    if (trace) {
+      trace.endScore = {
+        away: awayTeamStats.PTS,
+        home: homeTeamStats.PTS
+      };
+      trace.points = offenseTeamStats.PTS - offensePointsBefore;
+      trace.summary ||= `${offense.shortName} possession`;
+      possessions.push(trace);
+    }
+  };
+
+  for (let periodIndex = 0; periodIndex < matchup.quarters.length; periodIndex += 1) {
+    const periodPossessions = matchup.quarters[periodIndex];
     const awayBefore = awayTeamStats.PTS;
     const homeBefore = homeTeamStats.PTS;
-    for (let possession = 0; possession < possessions; possession += 1) {
-      resolvePossession(away, home, matchup.awayStatic, matchupOptions, awayPlayerStats, homePlayerStats, awayTeamStats, homeTeamStats, rng);
-      resolvePossession(home, away, matchup.homeStatic, matchupOptions, homePlayerStats, awayPlayerStats, homeTeamStats, awayTeamStats, rng);
+    for (let possession = 0; possession < periodPossessions; possession += 1) {
+      playPossession(periodIndex, possession, "away", away, home, matchup.awayStatic, awayPlayerStats, homePlayerStats, awayTeamStats, homeTeamStats);
+      playPossession(periodIndex, possession, "home", home, away, matchup.homeStatic, homePlayerStats, awayPlayerStats, homeTeamStats, awayTeamStats);
     }
     quarters.push({
       away: awayTeamStats.PTS - awayBefore,
@@ -1239,11 +1554,12 @@ export function simulateGame(
 
   let overtimePeriods = 0;
   while (awayTeamStats.PTS === homeTeamStats.PTS && overtimePeriods < simParams.maxOvertimePeriods) {
+    const periodIndex = 4 + overtimePeriods;
     const awayBefore = awayTeamStats.PTS;
     const homeBefore = homeTeamStats.PTS;
     for (let possession = 0; possession < matchup.overtimePossessionsEach; possession += 1) {
-      resolvePossession(away, home, matchup.awayStatic, matchupOptions, awayPlayerStats, homePlayerStats, awayTeamStats, homeTeamStats, rng);
-      resolvePossession(home, away, matchup.homeStatic, matchupOptions, homePlayerStats, awayPlayerStats, homeTeamStats, awayTeamStats, rng);
+      playPossession(periodIndex, possession, "away", away, home, matchup.awayStatic, awayPlayerStats, homePlayerStats, awayTeamStats, homeTeamStats);
+      playPossession(periodIndex, possession, "home", home, away, matchup.homeStatic, homePlayerStats, awayPlayerStats, homeTeamStats, awayTeamStats);
     }
     quarters.push({
       away: awayTeamStats.PTS - awayBefore,
@@ -1261,7 +1577,7 @@ export function simulateGame(
 
   const winnerTeamId = awayTeamStats.PTS > homeTeamStats.PTS ? away.id : homeTeamStats.PTS > awayTeamStats.PTS ? home.id : "tie";
 
-  return {
+  const result = {
     id: `game-${seed}-${away.id}-at-${home.id}`,
     awayTeamId: away.id,
     homeTeamId: home.id,
@@ -1281,6 +1597,31 @@ export function simulateGame(
     source,
     playedAt: new Date().toISOString()
   };
+
+  return {
+    seed,
+    result,
+    possessions
+  };
+}
+
+export function simulateGame(
+  away: DiceTeamCard,
+  home: DiceTeamCard,
+  seed = Date.now(),
+  source: "simulated" | "manual" = "simulated",
+  options: Partial<MatchupOptions> = defaultMatchupOptions
+): GameResult {
+  return simulateGameInternal(away, home, seed, source, options, false).result;
+}
+
+export function simulateTracedGame(
+  away: DiceTeamCard,
+  home: DiceTeamCard,
+  seed = Date.now(),
+  options: Partial<MatchupOptions> = defaultMatchupOptions
+): TracedGameResult {
+  return simulateGameInternal(away, home, seed, "simulated", options, true);
 }
 
 export function summarizeSimulations(
