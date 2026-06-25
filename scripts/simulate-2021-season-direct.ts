@@ -5,8 +5,8 @@ import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import scheduleData from "../src/data/bbr/raw/schedule-2021.json";
 import { simulateGame } from "../src/lib/diceEngine";
-import { diceTeams } from "../src/lib/sourceData";
-import type { DiceTeamCard } from "../src/lib/types";
+import { diceTeams } from "./sourceDataStatic";
+import type { DiceTeamCard, MatchupOptions } from "../src/lib/types";
 import { SeededRandom } from "../src/lib/random";
 
 type ScheduleGame = {
@@ -546,6 +546,14 @@ function teamForGame(runtime: AvailabilityRuntime, teamId: string, rng: SeededRa
   return activeTeamCard(profile, rng);
 }
 
+function runtimeMatchupOptions(runtime: AvailabilityRuntime): MatchupOptions {
+  const context = runtime.profiles.values().next().value?.context;
+  return {
+    venue: "home-court",
+    intensity: context === "postseason" ? "playoff" : "regular"
+  };
+}
+
 function groupSeedRows(rows: Array<{ teamId: string; seed: number; conference: Conference }>): Record<Conference, string[]> {
   return {
     East: rows
@@ -613,7 +621,7 @@ function rankTeams(teamIds: string[], wins: Map<string, number>, rng?: SeededRan
 function simulateWinner(awayId: string, homeId: string, runtime: AvailabilityRuntime, rng: SeededRandom): { winnerId: string; brokenTie: boolean } {
   const away = teamForGame(runtime, awayId, rng);
   const home = teamForGame(runtime, homeId, rng);
-  const result = simulateGame(away, home, rng.pickSeed());
+  const result = simulateGame(away, home, rng.pickSeed(), "simulated", runtimeMatchupOptions(runtime));
   if (result.winnerTeamId === "tie") {
     return {
       winnerId: rng.next() < 0.5 ? away.id : home.id,

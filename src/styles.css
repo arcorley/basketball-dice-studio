@@ -161,6 +161,10 @@ a {
   flex-wrap: wrap;
 }
 
+.season-filter {
+  min-width: 150px;
+}
+
 .btn {
   min-height: 36px;
   border-radius: 8px;
@@ -458,6 +462,12 @@ tr:last-child td {
   padding: 5px 7px;
 }
 
+.form-error {
+  color: #b42318;
+  font-weight: 700;
+  margin: 0;
+}
+
 .print-root {
   display: none;
 }
@@ -492,7 +502,7 @@ tr:last-child td {
 
 .score-meta {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
   gap: 6px;
   margin-bottom: 8px;
   font-size: 12px;

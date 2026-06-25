@@ -5,20 +5,59 @@ import path from "node:path";
 import process from "node:process";
 
 const root = process.cwd();
-const manifestPath = path.join(root, "data", "source-manifest.json");
 const rawDir = path.join(root, "src", "data", "bbr", "raw");
-const generatedPath = path.join(root, "src", "data", "teams.generated.json");
-const session = "basketball-dice-bbr";
+
+const argValues = new Map(
+  process.argv
+    .slice(2)
+    .filter((arg) => arg.startsWith("--") && arg.includes("="))
+    .map((arg) => {
+      const [key, ...rest] = arg.slice(2).split("=");
+      return [key, rest.join("=")];
+    })
+);
+const flags = new Set(process.argv.slice(2).filter((arg) => arg.startsWith("--") && !arg.includes("=")).map((arg) => arg.slice(2)));
+const manifestPath = path.resolve(argValues.get("manifest") ?? path.join(root, "data", "source-manifest.json"));
+const generatedPath = path.resolve(argValues.get("output") ?? path.join(root, "data", "teams.generated.json"));
+const session = argValues.get("session") ?? "basketball-dice-bbr";
 const useCache = process.argv.includes("--use-cache");
+const fetchOnly = flags.has("fetch-only");
+const teamsOnly = flags.has("teams-only");
+const leaguesOnly = flags.has("leagues-only");
+const startYear = argValues.has("start-year") ? Number(argValues.get("start-year")) : null;
+const endYear = argValues.has("end-year") ? Number(argValues.get("end-year")) : null;
+const teamOffset = argValues.has("team-offset") ? Number(argValues.get("team-offset")) : 0;
+const teamLimit = argValues.has("team-limit") ? Number(argValues.get("team-limit")) : Infinity;
 
 const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+
+function inYearRange(item) {
+  if (startYear !== null && item.seasonEndYear < startYear) return false;
+  if (endYear !== null && item.seasonEndYear > endYear) return false;
+  return true;
+}
+
+if ([startYear, endYear, teamOffset, teamLimit].some((value) => value !== null && value !== Infinity && (!Number.isFinite(value) || value < 0))) {
+  throw new Error(
+    "Usage: node scripts/fetch-bbr-data.mjs [--use-cache] [--fetch-only] [--teams-only] [--leagues-only] [--session=name] [--manifest=data/source-manifest.json] [--output=data/teams.generated.json] [--start-year=1990] [--end-year=2025] [--team-offset=0] [--team-limit=100]"
+  );
+}
+
+if (teamsOnly && leaguesOnly) {
+  throw new Error("--teams-only and --leagues-only cannot be used together.");
+}
+
+const selectedTeams = leaguesOnly
+  ? []
+  : manifest.teams.filter(inYearRange).slice(teamOffset, teamLimit === Infinity ? undefined : teamOffset + teamLimit);
+const selectedLeagues = teamsOnly ? [] : (manifest.leagueSources ?? []).filter(inYearRange);
 
 function runAgentBrowser(args, input = undefined, options = {}) {
   const result = spawnSync("agent-browser", args, {
     input,
     encoding: "utf8",
     maxBuffer: 1024 * 1024 * 50,
-    timeout: 120000,
+    timeout: 300000,
     ...options
   });
 
@@ -67,12 +106,30 @@ function cell(row, key) {
   return row?.[key]?.text ?? "";
 }
 
+function href(row, key) {
+  return row?.[key]?.href ?? "";
+}
+
+function playerSourceId(url) {
+  const match = String(url).match(/\/players\/[^/]+\/([^/.]+)\.html$/);
+  return match?.[1] ?? "";
+}
+
 function firstRow(table) {
   return table?.rows?.[0] ?? {};
 }
 
 function cleanTeamName(name) {
   return String(name).replace(/\*/g, "").trim();
+}
+
+function cleanPlayerName(name) {
+  return String(name).replace(/\*/g, "").trim();
+}
+
+function playerRowKey(row, nameKey = "name_display") {
+  const sourceUrl = href(row, nameKey) || href(row, "player");
+  return playerSourceId(sourceUrl) || cleanPlayerName(cell(row, nameKey) || cell(row, "player"));
 }
 
 function sumRows(rows, key) {
@@ -144,8 +201,128 @@ function opponentTotalsFromTeamAndOpponent(table) {
   return table?.rows?.find((row) => cell(row, "opp_fg") || cell(row, "opp_fga") || cell(row, "opp_pts")) ?? {};
 }
 
+function playerStatProfile(perGame = {}, totals = {}, perPoss = {}, advanced = {}, shooting = {}, pbp = {}) {
+  if (!playerRowKey(perGame)) return null;
+  return {
+    games: num(cell(perGame, "games")),
+    gamesStarted: num(cell(perGame, "games_started")),
+    minutes: num(cell(totals, "mp")),
+    perGame: {
+      mp: num(cell(perGame, "mp_per_g")),
+      pts: num(cell(perGame, "pts_per_g")),
+      trb: num(cell(perGame, "trb_per_g")),
+      ast: num(cell(perGame, "ast_per_g")),
+      stl: num(cell(perGame, "stl_per_g")),
+      blk: num(cell(perGame, "blk_per_g")),
+      tov: num(cell(perGame, "tov_per_g")),
+      pf: num(cell(perGame, "pf_per_g")),
+      fga: num(cell(perGame, "fga_per_g")),
+      fg3a: num(cell(perGame, "fg3a_per_g")),
+      fta: num(cell(perGame, "fta_per_g"))
+    },
+    totals: {
+      fg: num(cell(totals, "fg")),
+      fga: num(cell(totals, "fga")),
+      fgPct: num(cell(totals, "fg_pct")),
+      fg3: num(cell(totals, "fg3")),
+      fg3a: num(cell(totals, "fg3a")),
+      fg3Pct: num(cell(totals, "fg3_pct")),
+      fg2: num(cell(totals, "fg2")),
+      fg2a: num(cell(totals, "fg2a")),
+      fg2Pct: num(cell(totals, "fg2_pct")),
+      ft: num(cell(totals, "ft")),
+      fta: num(cell(totals, "fta")),
+      ftPct: num(cell(totals, "ft_pct")),
+      orb: num(cell(totals, "orb")),
+      drb: num(cell(totals, "drb")),
+      trb: num(cell(totals, "trb")),
+      ast: num(cell(totals, "ast")),
+      stl: num(cell(totals, "stl")),
+      blk: num(cell(totals, "blk")),
+      tov: num(cell(totals, "tov")),
+      pf: num(cell(totals, "pf")),
+      pts: num(cell(totals, "pts"))
+    },
+    per100: {
+      fga: num(cell(perPoss, "fga_per_poss")),
+      fg3a: num(cell(perPoss, "fg3a_per_poss")),
+      fta: num(cell(perPoss, "fta_per_poss")),
+      orb: num(cell(perPoss, "orb_per_poss")),
+      drb: num(cell(perPoss, "drb_per_poss")),
+      trb: num(cell(perPoss, "trb_per_poss")),
+      ast: num(cell(perPoss, "ast_per_poss")),
+      stl: num(cell(perPoss, "stl_per_poss")),
+      blk: num(cell(perPoss, "blk_per_poss")),
+      tov: num(cell(perPoss, "tov_per_poss")),
+      pf: num(cell(perPoss, "pf_per_poss")),
+      pts: num(cell(perPoss, "pts_per_poss")),
+      offRtg: num(cell(perPoss, "off_rtg")),
+      defRtg: num(cell(perPoss, "def_rtg"))
+    },
+    advanced: {
+      usagePct: num(cell(advanced, "usg_pct")),
+      tsPct: num(cell(advanced, "ts_pct")),
+      threeAttemptRate: num(cell(advanced, "fg3a_per_fga_pct")),
+      freeThrowRate: num(cell(advanced, "fta_per_fga_pct")),
+      orbPct: num(cell(advanced, "orb_pct")),
+      drbPct: num(cell(advanced, "drb_pct")),
+      trbPct: num(cell(advanced, "trb_pct")),
+      astPct: num(cell(advanced, "ast_pct")),
+      stlPct: num(cell(advanced, "stl_pct")),
+      blkPct: num(cell(advanced, "blk_pct")),
+      tovPct: num(cell(advanced, "tov_pct")),
+      ows: num(cell(advanced, "ows")),
+      dws: num(cell(advanced, "dws")),
+      ws: num(cell(advanced, "ws")),
+      obpm: num(cell(advanced, "obpm")),
+      dbpm: num(cell(advanced, "dbpm")),
+      bpm: num(cell(advanced, "bpm"))
+    },
+    shooting: {
+      avgDistance: num(cell(shooting, "avg_dist")),
+      pctFga2p: num(cell(shooting, "pct_fga_fg2a")),
+      pctFga00_03: num(cell(shooting, "pct_fga_00_03")),
+      pctFga03_10: num(cell(shooting, "pct_fga_03_10")),
+      pctFga10_16: num(cell(shooting, "pct_fga_10_16")),
+      pctFga16_xx: num(cell(shooting, "pct_fga_16_xx")),
+      pctFga3p: num(cell(shooting, "pct_fga_fg3a")),
+      fgPct2p: num(cell(shooting, "fg_pct_fg2a")),
+      fgPct00_03: num(cell(shooting, "fg_pct_00_03")),
+      fgPct03_10: num(cell(shooting, "fg_pct_03_10")),
+      fgPct10_16: num(cell(shooting, "fg_pct_10_16")),
+      fgPct16_xx: num(cell(shooting, "fg_pct_16_xx")),
+      fgPct3p: num(cell(shooting, "fg_pct_fg3a")),
+      pctAst2p: num(cell(shooting, "pct_ast_fg2")),
+      pctAst3p: num(cell(shooting, "pct_ast_fg3")),
+      pctFgaDunk: num(cell(shooting, "pct_fga_dunk")),
+      fgDunk: num(cell(shooting, "fg_dunk")),
+      pctCorner3: num(cell(shooting, "pct_fg3a_corner3")),
+      corner3Pct: num(cell(shooting, "fg_pct_corner3"))
+    },
+    playByPlay: {
+      plusMinusOn: num(cell(pbp, "plus_minus_on")),
+      plusMinusNet: num(cell(pbp, "plus_minus_net")),
+      badPassTurnovers: num(cell(pbp, "tov_bad_pass")),
+      lostBallTurnovers: num(cell(pbp, "tov_lost_ball")),
+      shootingFouls: num(cell(pbp, "fouls_shooting")),
+      offensiveFouls: num(cell(pbp, "fouls_offensive")),
+      drawnShooting: num(cell(pbp, "drawn_shooting")),
+      drawnOffensive: num(cell(pbp, "drawn_offensive")),
+      assistedPoints: num(cell(pbp, "astd_pts")),
+      andOnes: num(cell(pbp, "and1s")),
+      ownShotsBlocked: num(cell(pbp, "own_shots_blk"))
+    }
+  };
+}
+
 function normalizeTeam(def, page) {
   const tableMap = normalizeTableMap(page.tables);
+  const requiredTables = ["team_misc", "team_and_opponent", "per_game_stats", "totals_stats", "per_poss", "advanced", "roster"];
+  const missing = requiredTables.filter((tableId) => !tableMap[tableId]?.rows?.length);
+  if (missing.length) {
+    throw new Error(`Missing required team tables for ${def.id}: ${missing.join(", ")}`);
+  }
+
   const teamMisc = firstRow(tableMap.team_misc);
   const teamTotals = firstRow(tableMap.team_and_opponent);
   const opponentTotals = opponentTotalsFromTeamAndOpponent(tableMap.team_and_opponent);
@@ -155,29 +332,53 @@ function normalizeTeam(def, page) {
   const advancedRows = tableMap.advanced?.rows ?? [];
   const shootingRows = tableMap.shooting?.rows ?? [];
   const pbpRows = tableMap.pbp_stats?.rows ?? [];
+  const postPerGameRows = tableMap.per_game_stats_post?.rows ?? [];
+  const postTotalsRows = tableMap.totals_stats_post?.rows ?? [];
+  const postPerPossRows = tableMap.per_poss_post?.rows ?? [];
+  const postAdvancedRows = tableMap.advanced_post?.rows ?? [];
+  const postShootingRows = tableMap.shooting_post?.rows ?? [];
+  const postPbpRows = tableMap.pbp_stats_post?.rows ?? [];
   const rosterRows = tableMap.roster?.rows ?? [];
 
-  const byName = (rows, nameKey = "name_display") =>
-    new Map(rows.map((row) => [cell(row, nameKey) || cell(row, "player"), row]));
+  const byPlayerKey = (rows, nameKey = "name_display") =>
+    new Map(rows.map((row) => [playerRowKey(row, nameKey), row]).filter(([key]) => key));
 
-  const totalsByName = byName(totalsRows);
-  const perPossByName = byName(perPossRows);
-  const advancedByName = byName(advancedRows);
-  const shootingByName = byName(shootingRows);
-  const pbpByName = byName(pbpRows);
-  const rosterByName = byName(rosterRows, "player");
+  const totalsByPlayer = byPlayerKey(totalsRows);
+  const perPossByPlayer = byPlayerKey(perPossRows);
+  const advancedByPlayer = byPlayerKey(advancedRows);
+  const shootingByPlayer = byPlayerKey(shootingRows);
+  const pbpByPlayer = byPlayerKey(pbpRows);
+  const postPerGameByPlayer = byPlayerKey(postPerGameRows);
+  const postTotalsByPlayer = byPlayerKey(postTotalsRows);
+  const postPerPossByPlayer = byPlayerKey(postPerPossRows);
+  const postAdvancedByPlayer = byPlayerKey(postAdvancedRows);
+  const postShootingByPlayer = byPlayerKey(postShootingRows);
+  const postPbpByPlayer = byPlayerKey(postPbpRows);
+  const rosterByPlayer = byPlayerKey(rosterRows, "player");
 
   const players = perGameRows
     .map((perGame) => {
-      const name = cell(perGame, "name_display");
-      const totals = totalsByName.get(name) ?? {};
-      const perPoss = perPossByName.get(name) ?? {};
-      const advanced = advancedByName.get(name) ?? {};
-      const shooting = shootingByName.get(name) ?? {};
-      const pbp = pbpByName.get(name) ?? {};
-      const roster = rosterByName.get(name) ?? {};
+      const playerKey = playerRowKey(perGame);
+      const name = cleanPlayerName(cell(perGame, "name_display"));
+      const totals = totalsByPlayer.get(playerKey) ?? {};
+      const perPoss = perPossByPlayer.get(playerKey) ?? {};
+      const advanced = advancedByPlayer.get(playerKey) ?? {};
+      const shooting = shootingByPlayer.get(playerKey) ?? {};
+      const pbp = pbpByPlayer.get(playerKey) ?? {};
+      const roster = rosterByPlayer.get(playerKey) ?? {};
+      const sourceUrl = href(perGame, "name_display") || href(totals, "name_display") || href(roster, "player");
+      const postseason = playerStatProfile(
+        postPerGameByPlayer.get(playerKey),
+        postTotalsByPlayer.get(playerKey),
+        postPerPossByPlayer.get(playerKey),
+        postAdvancedByPlayer.get(playerKey),
+        postShootingByPlayer.get(playerKey),
+        postPbpByPlayer.get(playerKey)
+      );
 
       return {
+        sourceId: playerSourceId(sourceUrl),
+        sourceUrl,
         name,
         position: cell(perGame, "pos") || cell(roster, "pos"),
         age: num(cell(perGame, "age")),
@@ -258,12 +459,21 @@ function normalizeTeam(def, page) {
         shooting: {
           avgDistance: num(cell(shooting, "avg_dist")),
           pctFga2p: num(cell(shooting, "pct_fga_fg2a")),
+          pctFga00_03: num(cell(shooting, "pct_fga_00_03")),
+          pctFga03_10: num(cell(shooting, "pct_fga_03_10")),
+          pctFga10_16: num(cell(shooting, "pct_fga_10_16")),
+          pctFga16_xx: num(cell(shooting, "pct_fga_16_xx")),
           pctFga3p: num(cell(shooting, "pct_fga_fg3a")),
           fgPct2p: num(cell(shooting, "fg_pct_fg2a")),
+          fgPct00_03: num(cell(shooting, "fg_pct_00_03")),
+          fgPct03_10: num(cell(shooting, "fg_pct_03_10")),
+          fgPct10_16: num(cell(shooting, "fg_pct_10_16")),
+          fgPct16_xx: num(cell(shooting, "fg_pct_16_xx")),
           fgPct3p: num(cell(shooting, "fg_pct_fg3a")),
           pctAst2p: num(cell(shooting, "pct_ast_fg2")),
           pctAst3p: num(cell(shooting, "pct_ast_fg3")),
           pctFgaDunk: num(cell(shooting, "pct_fga_dunk")),
+          fgDunk: num(cell(shooting, "fg_dunk")),
           pctCorner3: num(cell(shooting, "pct_fg3a_corner3")),
           corner3Pct: num(cell(shooting, "fg_pct_corner3"))
         },
@@ -280,6 +490,7 @@ function normalizeTeam(def, page) {
           andOnes: num(cell(pbp, "and1s")),
           ownShotsBlocked: num(cell(pbp, "own_shots_blk"))
         },
+        postseason,
         roster: {
           number: cell(roster, "number"),
           height: cell(roster, "height"),
@@ -604,7 +815,7 @@ function getPage(rawName, url, waitExpression) {
     return JSON.parse(fs.readFileSync(rawPath, "utf8"));
   }
 
-  const openResult = runAgentBrowser(["--session", session, "open", url], undefined, { timeout: 90000 });
+  const openResult = runAgentBrowser(["--session", session, "open", url], undefined, { timeout: 300000 });
   if (openResult.status !== 0) {
     console.warn(openResult.stderr || `Open returned status ${openResult.status}; trying to extract current page.`);
   }
@@ -617,20 +828,22 @@ function getPage(rawName, url, waitExpression) {
 
 const normalizedTeams = [];
 
-for (const team of manifest.teams) {
-  console.log(`Fetching ${team.name}`);
+for (const team of selectedTeams) {
+  console.log(`${fetchOnly ? "Caching" : "Fetching"} ${team.name}`);
   const page = getPage(`${team.id}.json`, team.sourceUrl, "document.querySelectorAll('table').length > 5");
   if (!page.url.includes(`/teams/${team.abbr}/`) || !page.url.includes(`/${team.seasonEndYear}.html`)) {
     throw new Error(`Unexpected page for ${team.id}: ${page.url}`);
   }
 
-  normalizedTeams.push(normalizeTeam(team, page));
+  if (!fetchOnly) {
+    normalizedTeams.push(normalizeTeam(team, page));
+  }
 }
 
 const normalizedLeagues = [];
 
-for (const league of manifest.leagueSources ?? []) {
-  console.log(`Fetching ${league.season} NBA league summary`);
+for (const league of selectedLeagues) {
+  console.log(`${fetchOnly ? "Caching" : "Fetching"} ${league.season} NBA league summary`);
   const page = getPage(
     `league-${league.seasonEndYear}.json`,
     league.sourceUrl,
@@ -640,10 +853,10 @@ for (const league of manifest.leagueSources ?? []) {
     throw new Error(`Unexpected page for ${league.season}: ${page.url}`);
   }
 
-  const normalizedLeague = normalizeLeague(league, page);
+  const normalizedLeague = fetchOnly ? null : normalizeLeague(league, page);
 
   const playerAdvancedUrl = league.sourceUrl.replace(".html", "_advanced.html");
-  console.log(`Fetching ${league.season} NBA player advanced distributions`);
+  console.log(`${fetchOnly ? "Caching" : "Fetching"} ${league.season} NBA player advanced distributions`);
   const playerPage = getPage(
     `league-${league.seasonEndYear}-players-advanced.json`,
     playerAdvancedUrl,
@@ -653,8 +866,16 @@ for (const league of manifest.leagueSources ?? []) {
     throw new Error(`Unexpected player advanced page for ${league.season}: ${playerPage.url}`);
   }
 
-  Object.assign(normalizedLeague, normalizePlayerDistributions(league, playerPage));
-  normalizedLeagues.push(normalizedLeague);
+  if (!fetchOnly) {
+    Object.assign(normalizedLeague, normalizePlayerDistributions(league, playerPage));
+    normalizedLeagues.push(normalizedLeague);
+  }
+}
+
+if (fetchOnly) {
+  runAgentBrowser(["--session", session, "close"]);
+  console.log(`Cached ${selectedTeams.length} team pages and ${selectedLeagues.length * 2} league/player pages.`);
+  process.exit(0);
 }
 
 const output = {

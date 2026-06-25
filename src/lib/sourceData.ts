@@ -1,22 +1,46 @@
-import generatedData from "../data/teams.generated.json";
-import type { DiceTeamCard, GeneratedSourceData, SourceLeague, SourceTeam } from "./types";
+import type { DiceTeamCard, SourceCatalog, SourceLeague, SourceTeam } from "./types";
 import { buildDiceTeamCards } from "./teamCards";
 
-export const sourceData = generatedData as GeneratedSourceData;
+const dataBaseUrl = `${import.meta.env.BASE_URL}data`;
+let catalogPromise: Promise<SourceCatalog> | null = null;
+const sourceTeamPromises = new Map<string, Promise<SourceTeam>>();
+const diceTeamPromises = new Map<string, Promise<DiceTeamCard>>();
 
-export const sourceTeams: SourceTeam[] = sourceData.teams;
-export const sourceLeagues: SourceLeague[] = sourceData.leagues ?? [];
-
-export const diceTeams: DiceTeamCard[] = buildDiceTeamCards(sourceTeams, sourceLeagues);
-
-export const teamsById = new Map(diceTeams.map((team) => [team.id, team]));
-
-export function getTeam(teamId: string): DiceTeamCard {
-  const team = teamsById.get(teamId);
-  if (!team) {
-    throw new Error(`Unknown team: ${teamId}`);
+async function fetchJson<T>(url: string): Promise<T> {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Failed to load ${url}: ${response.status}`);
   }
-  return team;
+  return (await response.json()) as T;
+}
+
+export function teamDetailUrl(teamId: string): string {
+  return `${dataBaseUrl}/teams/${teamId}.json`;
+}
+
+export function loadSourceCatalog(): Promise<SourceCatalog> {
+  catalogPromise ??= fetchJson<SourceCatalog>(`${dataBaseUrl}/catalog.generated.json`);
+  return catalogPromise;
+}
+
+export function loadSourceTeam(teamId: string): Promise<SourceTeam> {
+  const cached = sourceTeamPromises.get(teamId);
+  if (cached) return cached;
+
+  const promise = fetchJson<SourceTeam>(teamDetailUrl(teamId));
+  sourceTeamPromises.set(teamId, promise);
+  return promise;
+}
+
+export async function loadDiceTeam(teamId: string, leagues?: SourceLeague[]): Promise<DiceTeamCard> {
+  const cached = diceTeamPromises.get(teamId);
+  if (cached) return cached;
+
+  const promise = Promise.all([loadSourceTeam(teamId), leagues ? Promise.resolve(leagues) : loadSourceCatalog().then((catalog) => catalog.leagues)]).then(
+    ([source, sourceLeagues]) => buildDiceTeamCards([source], sourceLeagues)[0]
+  );
+  diceTeamPromises.set(teamId, promise);
+  return promise;
 }
 
 export function formatNumber(value: number | null | undefined, digits = 1): string {

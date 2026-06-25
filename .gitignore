@@ -2,3 +2,7 @@ node_modules/
 dist/
 .DS_Store
 *.log
+scripts/__pycache__/
+reports/sanity-*.json
+data/teams.generated.json
+src/data/teams.generated.json

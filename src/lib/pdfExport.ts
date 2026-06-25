@@ -23,12 +23,14 @@ function drawHeader(doc: PdfDoc, matchup: MatchupCard, team: DiceTeamCard): void
   doc.setFontSize(10);
   doc.text(`Opponent: ${opponent.shortName}`, pageWidth - 205, 18);
   doc.text(`Possessions: ${matchup.possessionsEach}`, pageWidth - 205, 31);
+  doc.text(`Context: ${matchup.context.label}`, 28, 38);
 
   doc.setTextColor(28, 37, 34);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(9);
   const quarterText = `Quarter targets: Q1 ${matchup.quarters[0]} / Q2 ${matchup.quarters[1]} / Q3 ${matchup.quarters[2]} / Q4 ${matchup.quarters[3]}`;
   doc.text(quarterText, 28, 58);
+  doc.text(`OT target: ${matchup.overtimePossessionsEach} possessions`, 28, 70);
 
   doc.setFont("helvetica", "normal");
   doc.text("Manual tally boxes are intentionally large for tabletop tracking.", pageWidth - 300, 58);
@@ -43,7 +45,7 @@ function drawTeamScoresheet(doc: PdfDoc, autoTable: AutoTable, matchup: MatchupC
   ];
 
   autoTable(doc, {
-    startY: 70,
+    startY: 82,
     head: [["Player", ...scoreColumns]],
     body: rows,
     theme: "grid",

@@ -5,7 +5,7 @@ import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import scheduleData from "../src/data/bbr/raw/schedule-2021.json";
 import { simulateGame } from "../src/lib/diceEngine";
-import { diceTeams } from "../src/lib/sourceData";
+import { diceTeams } from "./sourceDataStatic";
 import type { DiceTeamCard } from "../src/lib/types";
 import { SeededRandom } from "../src/lib/random";
 
@@ -178,7 +178,7 @@ function estimateMatchups(tasks: MatchupTask[]): MatchupEstimate[] {
     let homePoints = 0;
 
     for (let index = 0; index < task.samples; index += 1) {
-      const result = simulateGame(away, home, rng.pickSeed());
+      const result = simulateGame(away, home, rng.pickSeed(), "simulated", { venue: "home-court", intensity: "regular" });
       awayPoints += result.awayScore;
       homePoints += result.homeScore;
       if (result.winnerTeamId === away.id) {

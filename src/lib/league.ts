@@ -1,6 +1,5 @@
 import { simulateGame } from "./diceEngine";
-import { getTeam } from "./sourceData";
-import type { GameResult, LeagueGame, LeagueState, StatLine } from "./types";
+import type { DiceTeamCard, GameResult, LeagueGame, LeagueState, StatLine } from "./types";
 
 export function createLeague(name: string, teamIds: string[]): LeagueState {
   const games: LeagueGame[] = [];
@@ -24,10 +23,8 @@ export function createLeague(name: string, teamIds: string[]): LeagueState {
   };
 }
 
-export function simulateLeagueGame(league: LeagueState, gameId: string, seed = Date.now()): LeagueState {
+export function simulateLeagueGameWithTeams(league: LeagueState, gameId: string, away: DiceTeamCard, home: DiceTeamCard, seed = Date.now()): LeagueState {
   return updateGame(league, gameId, (game) => {
-    const away = getTeam(game.awayTeamId);
-    const home = getTeam(game.homeTeamId);
     return {
       ...game,
       status: "simulated",

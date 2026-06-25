@@ -1,10 +1,14 @@
 import { buildMatchupCard, summarizeSimulations } from "../src/lib/diceEngine";
-import { diceTeams } from "../src/lib/sourceData";
-import type { DiceTeamCard, SourcePlayer, StatLine } from "../src/lib/types";
+import { diceTeams } from "./sourceDataStatic";
+import type { DiceTeamCard, MatchupOptions, SourcePlayer, SourcePlayerPostseasonProfile, StatLine } from "../src/lib/types";
 
-const [awayId = "2020-21-pho", homeId = "1992-93-chi", gamesArg = "500", seedArg = "4242"] = process.argv.slice(2);
+const [awayId = "2020-21-pho", homeId = "1992-93-chi", gamesArg = "500", seedArg = "4242", venueArg = "home-court", intensityArg = "regular"] = process.argv.slice(2);
 const games = Number(gamesArg);
 const seed = Number(seedArg);
+const matchupOptions: MatchupOptions = {
+  venue: venueArg === "neutral" ? "neutral" : "home-court",
+  intensity: intensityArg === "playoff" ? "playoff" : "regular"
+};
 
 function pct(value: number): string {
   return `${(value * 100).toFixed(1)}%`;
@@ -79,8 +83,20 @@ function deltas(sim: ReturnType<typeof simTeamLine>, source: ReturnType<typeof s
   };
 }
 
+function playerProfilePerGameLine(profile: SourcePlayer | SourcePlayerPostseasonProfile, games: number) {
+  return {
+    pts: fixed(perGame(profile.totals.pts, games), 1),
+    fga: fixed(perGame(profile.totals.fga, games), 1),
+    threePa: fixed(perGame(profile.totals.fg3a, games), 1),
+    fta: fixed(perGame(profile.totals.fta, games), 1),
+    tov: fixed(perGame(profile.totals.tov, games), 1),
+    ast: fixed(perGame(profile.totals.ast, games), 1)
+  };
+}
+
 function playerSourceLine(player: SourcePlayer, team: DiceTeamCard) {
   const games = sourceGames(team);
+  const postseasonGames = player.postseason?.games;
   return {
     active: {
       pts: player.perGame.pts ?? 0,
@@ -90,14 +106,14 @@ function playerSourceLine(player: SourcePlayer, team: DiceTeamCard) {
       tov: player.perGame.tov ?? 0,
       ast: player.perGame.ast ?? 0
     },
-    seasonTeamGame: {
-      pts: fixed(perGame(player.totals.pts, games), 1),
-      fga: fixed(perGame(player.totals.fga, games), 1),
-      threePa: fixed(perGame(player.totals.fg3a, games), 1),
-      fta: fixed(perGame(player.totals.fta, games), 1),
-      tov: fixed(perGame(player.totals.tov, games), 1),
-      ast: fixed(perGame(player.totals.ast, games), 1)
-    }
+    seasonTeamGame: playerProfilePerGameLine(player, games),
+    postseason:
+      player.postseason && postseasonGames !== null && postseasonGames !== undefined && Number.isFinite(postseasonGames) && postseasonGames > 0
+        ? {
+            games: postseasonGames,
+            ...playerProfilePerGameLine(player.postseason, postseasonGames)
+          }
+        : null
   };
 }
 
@@ -120,11 +136,11 @@ if (!away || !home) {
 }
 
 if (!Number.isFinite(games) || games <= 0 || !Number.isFinite(seed)) {
-  throw new Error("Usage: npm run calibrate:matchup -- <awayId> <homeId> <games> <seed>");
+  throw new Error("Usage: npm run calibrate:matchup -- <awayId> <homeId> <games> <seed> [home-court|neutral] [regular|playoff]");
 }
 
-const summary = summarizeSimulations(away, home, games, seed);
-const matchup = buildMatchupCard(away, home);
+const summary = summarizeSimulations(away, home, games, seed, matchupOptions);
+const matchup = buildMatchupCard(away, home, matchupOptions);
 
 for (const team of [away, home]) {
   const line = summary.teams[team.id];
@@ -140,6 +156,7 @@ for (const team of [away, home]) {
     JSON.stringify(
       {
         card: {
+          context: matchup.context.label,
           pace: Number(team.pace.toFixed(1)),
           shotQuality: fixed(team.shotQuality),
           defense: fixed(team.defense),
@@ -153,6 +170,13 @@ for (const team of [away, home]) {
           turnoverTarget: fixed(matchupStatic.turnoverTargetChance, 1),
           foulDrawTarget: fixed(matchupStatic.foulDrawTargetChance, 1),
           threeAttemptTarget: fixed(matchupStatic.threeAttemptTargetChance, 1),
+          playoffLeverageShotAdjustment: fixed(matchupStatic.playoffLeverageShotAdjustment, 2),
+          eraTalent: {
+            talentDelta: fixed(matchupStatic.eraTalentAdjustment.talentDelta, 3),
+            shotMakeAdjustment: fixed(matchupStatic.eraTalentAdjustment.shotMakeAdjustment, 2),
+            turnoverAdjustment: fixed(matchupStatic.eraTalentAdjustment.turnoverAdjustment, 2),
+            reboundAdjustment: fixed(matchupStatic.eraTalentAdjustment.reboundAdjustment, 2)
+          },
           turnoverScale: fixed(matchupStatic.turnoverScale, 2),
           foulDrawScale: fixed(matchupStatic.foulDrawScale, 2),
           threeAttemptScale: fixed(matchupStatic.threeAttemptScale, 2),
@@ -166,17 +190,25 @@ for (const team of [away, home]) {
           const raw = rangeByPlayer.get(player.name);
           return {
             name: player.name,
+            contextWeights: {
+              useWeight: fixed(player.useWeight, 2),
+              playoffUseWeight: fixed(player.playoffUseWeight, 2),
+              playoffWeightSource: player.playoffWeightSource,
+              postseasonGames: player.postseasonGames
+            },
             effective: raw
               ? {
                   tov: fixed(raw.tov, 1),
+                  liveBallTurnover: fixed(raw.liveBallTurnover, 1),
+                  offensiveFoulTurnover: fixed(raw.offensiveFoulTurnover, 1),
                   foulDraw: fixed(raw.fd, 1),
                   threeFrequency: fixed(raw.three, 1),
                   p2: fixed(raw.p2, 1),
-	                  p3: fixed(raw.p3, 1),
-	                  ft: fixed(raw.ft, 1),
-	                  andOne: fixed(raw.andOne, 1)
-	                }
-	              : null,
+                  p3: fixed(raw.p3, 1),
+                  ft: fixed(raw.ft, 1),
+                  andOne: fixed(raw.andOne, 1)
+                }
+              : null,
             sim: playerSimLine(summary.players[team.id][player.name]),
             source: playerSourceLine(player.source, team)
           };

@@ -1,4 +1,4 @@
-import type { DicePlayerCard, DiceTeamCard, SourceLeague, SourcePlayer, SourceTeam } from "./types";
+import type { DicePlayerCard, DiceTeamCard, SourceLeague, SourcePlayer, SourcePlayerPostseasonProfile, SourceTeam, TurnoverProfileSource } from "./types";
 
 type NeutralContext = SourceLeague["averages"];
 
@@ -92,6 +92,9 @@ function leagueFor(source: SourceTeam, leaguesByYear: Map<number, SourceLeague>)
   const league = leaguesByYear.get(source.seasonEndYear);
   if (!league) {
     throw new Error(`Missing league source data for ${source.season}.`);
+  }
+  if (!league.strength || !isFiniteNumber(league.strength.talentPointsPer100)) {
+    throw new Error(`Missing league-strength source data for ${source.season}.`);
   }
   return league;
 }
@@ -191,11 +194,45 @@ function seasonMinutesPerTeamGame(player: SourcePlayer, teamGameCount: number): 
   return required(player.minutes, `${player.name} minutes`) / teamGameCount;
 }
 
+type PlayerWeightProfile = Pick<SourcePlayer, "games" | "totals" | "playByPlay"> | SourcePlayerPostseasonProfile;
+type PlayoffWeightProfile = { source: DicePlayerCard["playoffWeightSource"]; profile: PlayerWeightProfile };
+
+function profileGames(profile: PlayerWeightProfile, playerName: string): number {
+  return requiredPositive(required(profile.games, `${playerName} games`), `${playerName} games`);
+}
+
+function playerGames(player: SourcePlayer): number {
+  return profileGames(player, player.name);
+}
+
+function profileTotalPerGame(profile: PlayerWeightProfile, field: keyof SourcePlayer["totals"], playerName: string): number {
+  return required(profile.totals[field], `${playerName} ${field}`) / profileGames(profile, playerName);
+}
+
+function activeTotalPerGame(player: SourcePlayer, field: keyof SourcePlayer["totals"]): number {
+  return profileTotalPerGame(player, field, player.name);
+}
+
 function loadWeight(player: SourcePlayer, teamGameCount: number): number {
   const fga = seasonTotalPerTeamGame(player, "fga", teamGameCount);
   const fta = seasonTotalPerTeamGame(player, "fta", teamGameCount);
   const tov = seasonTotalPerTeamGame(player, "tov", teamGameCount);
   return Math.max(0.1, fga + 0.44 * fta + tov);
+}
+
+function profileLoadWeight(profile: PlayerWeightProfile, playerName: string): number {
+  const fga = profileTotalPerGame(profile, "fga", playerName);
+  const fta = profileTotalPerGame(profile, "fta", playerName);
+  const tov = profileTotalPerGame(profile, "tov", playerName);
+  return Math.max(0.1, fga + 0.44 * fta + tov);
+}
+
+function playoffWeightProfile(player: SourcePlayer): PlayoffWeightProfile {
+  const postseason = player.postseason;
+  if (postseason && isFiniteNumber(postseason.games) && postseason.games > 0) {
+    return { source: "postseason", profile: postseason };
+  }
+  return { source: "healthy-regular", profile: player };
 }
 
 function sourcedAndOnes(player: SourcePlayer): number | null {
@@ -217,6 +254,49 @@ function andOneChance(player: SourcePlayer): number {
   const madeFieldGoals = required(player.totals.fg, `${player.name} made field goals`);
   if (madeFieldGoals === 0) return 0;
   return modifier((andOnes / madeFieldGoals) * 100, 0, 35);
+}
+
+function turnoverProfile(player: SourcePlayer): {
+  turnoverProfile: TurnoverProfileSource;
+  liveBallTurnoverChance: number;
+  offensiveFoulTurnoverChance: number;
+} {
+  const turnovers = required(player.totals.tov, `${player.name} turnovers`);
+  if (turnovers <= 0) {
+    return {
+      turnoverProfile: "aggregate",
+      liveBallTurnoverChance: 0,
+      offensiveFoulTurnoverChance: 0
+    };
+  }
+
+  const badPass = player.playByPlay.badPassTurnovers;
+  const lostBall = player.playByPlay.lostBallTurnovers;
+  const offensiveFouls = player.playByPlay.offensiveFouls;
+  if (isFiniteNumber(badPass) && isFiniteNumber(lostBall) && isFiniteNumber(offensiveFouls)) {
+    const liveBall = Math.max(0, badPass) + Math.max(0, lostBall);
+    const offensive = Math.max(0, offensiveFouls);
+    const scale = liveBall + offensive > turnovers ? turnovers / (liveBall + offensive) : 1;
+    return {
+      turnoverProfile: "play-by-play",
+      liveBallTurnoverChance: modifier(((liveBall * scale) / turnovers) * 100, 0, 100),
+      offensiveFoulTurnoverChance: modifier(((offensive * scale) / turnovers) * 100, 0, 100)
+    };
+  }
+
+  return {
+    turnoverProfile: "aggregate",
+    liveBallTurnoverChance: 60,
+    offensiveFoulTurnoverChance: 0
+  };
+}
+
+function shootingFoulWeight(profile: PlayerWeightProfile, denominatorGames: number, playerName: string): number {
+  const shootingFouls = profile.playByPlay.shootingFouls;
+  if (isFiniteNumber(shootingFouls)) {
+    return Math.max(0, shootingFouls / denominatorGames);
+  }
+  return Math.max(0, required(profile.totals.pf, `${playerName} personal fouls`) / denominatorGames);
 }
 
 function translatedPlayerThreeRate(source: SourceTeam, player: SourcePlayer, league: SourceLeague, neutral: NeutralContext): number {
@@ -319,6 +399,11 @@ function playerCard(source: SourceTeam, player: SourcePlayer, league: SourceLeag
   const translatedFtaRate = translatedPlayerFtaRate(player, league, neutral);
   const offensiveImpact = playerOffensiveImpact(player, league);
   const defensiveImpact = playerDefensiveImpact(player, league);
+  const turnover = turnoverProfile(player);
+  const gamesPlayed = playerGames(player);
+  const impactUseMultiplier = clamp(1 + offensiveImpact * 0.045, 0.75, 1.28);
+  const playoffWeights = playoffWeightProfile(player);
+  const playoffGames = profileGames(playoffWeights.profile, player.name);
 
   return {
     id: `${teamId}:${player.name}`,
@@ -326,7 +411,11 @@ function playerCard(source: SourceTeam, player: SourcePlayer, league: SourceLeag
     name: player.name,
     position: player.position,
     minutes: required(player.minutes, `${player.name} minutes`),
-    useWeight: loadWeight(player, teamGameCount) * clamp(1 + offensiveImpact * 0.045, 0.75, 1.28),
+    useWeight: loadWeight(player, teamGameCount) * impactUseMultiplier,
+    playoffUseWeight: profileLoadWeight(playoffWeights.profile, player.name) * impactUseMultiplier,
+    playoffWeightSource: playoffWeights.source,
+    postseasonGames: playoffWeights.source === "postseason" ? playoffGames : null,
+    availabilityFactor: clamp(gamesPlayed / teamGameCount, 0, 1),
     tov: modifier(tovPer100 * 0.9 + tovPct * 0.8, 1, 24),
     fd: modifier(translatedFtaRate * 39, 0, 22),
     threeFrequency: modifier(translatedThreeRate * 100, 0, 95),
@@ -334,12 +423,23 @@ function playerCard(source: SourceTeam, player: SourcePlayer, league: SourceLeag
     p3: pctToD100(p3Pct),
     ft: pctToD100(ftMakePct),
     andOneChance: andOneChance(player),
+    turnoverProfile: turnover.turnoverProfile,
+    liveBallTurnoverChance: turnover.liveBallTurnoverChance,
+    offensiveFoulTurnoverChance: turnover.offensiveFoulTurnoverChance,
     astWeight: Math.max(0, seasonTotalPerTeamGame(player, "ast", teamGameCount)),
     orbWeight: Math.max(0, seasonTotalPerTeamGame(player, "orb", teamGameCount)),
     drbWeight: Math.max(0, seasonTotalPerTeamGame(player, "drb", teamGameCount)),
     stlWeight: Math.max(0, seasonTotalPerTeamGame(player, "stl", teamGameCount)),
     blkWeight: Math.max(0, seasonTotalPerTeamGame(player, "blk", teamGameCount)),
     pfWeight: Math.max(0, seasonTotalPerTeamGame(player, "pf", teamGameCount)),
+    shootingFoulWeight: shootingFoulWeight(player, teamGameCount, player.name),
+    playoffAstWeight: Math.max(0, profileTotalPerGame(playoffWeights.profile, "ast", player.name)),
+    playoffOrbWeight: Math.max(0, profileTotalPerGame(playoffWeights.profile, "orb", player.name)),
+    playoffDrbWeight: Math.max(0, profileTotalPerGame(playoffWeights.profile, "drb", player.name)),
+    playoffStlWeight: Math.max(0, profileTotalPerGame(playoffWeights.profile, "stl", player.name)),
+    playoffBlkWeight: Math.max(0, profileTotalPerGame(playoffWeights.profile, "blk", player.name)),
+    playoffPfWeight: Math.max(0, profileTotalPerGame(playoffWeights.profile, "pf", player.name)),
+    playoffShootingFoulWeight: shootingFoulWeight(playoffWeights.profile, playoffGames, player.name),
     calibration: {
       offensiveImpact,
       defensiveImpact,
@@ -415,6 +515,7 @@ export function buildDiceTeamCards(sourceTeams: SourceTeam[], leagues: SourceLea
       calibration: {
         leagueSeason: league.season,
         leagueAverages: league.averages,
+        leagueStrength: league.strength,
         playerOffenseSignal: playerSignals.offense,
         playerDefenseSignal: playerSignals.defense,
         teamOffenseSignal: offenseZ,
@@ -432,11 +533,19 @@ export const derivationNotes = [
   "Matchup cards translate shooting, 3PA share, FT%, and foul draw against the two teams' averaged league environments, so same-era matchups preserve that season and cross-era matchups meet at a midpoint context.",
   "Player shot making is era-relative and volume-regressed from sourced makes and attempts; missing percentages are only accepted when the player had zero sourced attempts.",
   "Foul draw uses sourced FTA/FGA against that season's league FTA/FGA, then team FTA/FGA and opponent FTA/FGA z-scores adjust the matchup.",
-  "Turnover and drawn-foul action ranges are matchup-scaled to sourced offense rates blended with opponent allowed rates, preserving individual player distribution inside the team target.",
+  "Turnover and drawn-foul action ranges are matchup-scaled to sourced offense rates blended with opponent allowed rates; cross-era matchups retain more of each offense's own style before applying opponent pressure, preserving individual player distribution inside the team target.",
   "3PA checks are matchup-scaled from offense 3PA rate and opponent allowed 3PA rate after both are translated into the matchup era context.",
+  "Regular context uses season-contribution player weights from totals per team game; playoff context uses sourced postseason player profiles when available, otherwise active-game regular profiles, so playoff rotations and individual form are not inferred from missed regular-season games.",
+  "Matchup cards split shot attempts into rim, short-mid, long-mid, and 3P zones with zone-specific make ranges from either sourced Basketball Reference distance tables or explicit provenance-labeled shot-location proxies.",
+  "Pre-1996-97 shot-location profiles use same-player sourced neighbor seasons when enough later FGA exists, then role/size/usage/stat neighbors when same-player samples are too thin; generated profiles preserve sourced 3PA/FGA and reconcile weighted 2P zone makes back to sourced 2P%.",
+  "Sourced 2P distance buckets are normalized inside the known 2P share when Basketball Reference leaves an unclassified distance remainder, preserving the sourced 2P/3P split without inserting default zone values.",
+  "Cross-era matchups apply a small league-strength scalar from full-season roster depth, qualified player depth per team, and league team count. Same-season matchups get a zero era-talent adjustment.",
+  "Playoff context adds a small precomputed top-end leverage adjustment from the offense's top rotation offensive impact against the defense's top rotation defensive impact, so concentrated two-way stars matter more without changing regular-season cards.",
   "When Basketball Reference play-by-play tables provide and-one counts, those free throws are modeled on made field goals instead of as separate no-FGA foul possessions.",
   "Drawn-foul branches use a source-derived foul-end check from the possession equation FGA + weighted FTA - ORB + TOV, letting bonus and continuation free throws preserve realistic shot volume.",
-  "Offensive rebound checks use the sourced matchup rate: offense ORB% blended with opponent allowed ORB% from defensive rebound percentage.",
+  "When sourced Basketball Reference play-by-play turnover types exist, player turnovers split into live-ball steal chances, offensive-foul turnovers, and dead-ball turnovers; older aggregate profiles keep the prior sourced-TOV structure with an explicit aggregate label.",
+  "Shooting fouls and and-ones use shooting-foul assignment weights when Basketball Reference play-by-play data provides them, otherwise they use sourced personal fouls.",
+  "Offensive rebound checks use an era-gap-aware sourced matchup rate: offense ORB% blended with opponent allowed ORB% from defensive rebound percentage, retaining more offense identity as teams get farther apart in time.",
   "SRS, margin context through league distributions, offensive rating, defensive rating, eFG%, turnovers, rebounding, and 3PA rate all contribute to static card modifiers.",
   "Team-level matchup modifiers are preserved as decimal values in the simulator and rounded only when converted into printable d100 ranges."
 ];

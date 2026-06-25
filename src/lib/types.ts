@@ -1,8 +1,52 @@
 export type StatLine = Record<string, number>;
 
 export type SourceCellNumber = number | null;
+export type ShotZone = "rim" | "shortMid" | "longMid" | "three";
+export type TurnoverProfileSource = "play-by-play" | "aggregate";
+export type ShotLocationProfileMethod = "sourced-location" | "same-player-neighbor-proxy" | "era-role-neighbor-proxy" | "manual-audit";
+export type SimVenue = "home-court" | "neutral";
+export type SimIntensity = "regular" | "playoff";
+
+export interface MatchupOptions {
+  venue: SimVenue;
+  intensity: SimIntensity;
+}
+
+export interface MatchupContext {
+  label: string;
+  venue: SimVenue;
+  intensity: SimIntensity;
+  homeCourtAdvantagePoints: number;
+  awayShotContextAdjustment: number;
+  homeShotContextAdjustment: number;
+  paceMultiplier: number;
+  useWeightMode: "regular" | "playoff-tightened";
+}
+
+export interface SourceShotLocationProfile {
+  method: ShotLocationProfileMethod;
+  modelVersion: string;
+  confidence: number;
+  sourceRefs: string[];
+  sourcePlayerSeasons: string[];
+  neighborCount: number;
+  sourceFga: number;
+  qualityWarnings: string[];
+  pctFga00_03: SourceCellNumber;
+  pctFga03_10: SourceCellNumber;
+  pctFga10_16: SourceCellNumber;
+  pctFga16_xx: SourceCellNumber;
+  pctFga3p: SourceCellNumber;
+  fgPct00_03: SourceCellNumber;
+  fgPct03_10: SourceCellNumber;
+  fgPct10_16: SourceCellNumber;
+  fgPct16_xx: SourceCellNumber;
+  fgPct3p: SourceCellNumber;
+}
 
 export interface SourcePlayer {
+  sourceId?: string;
+  sourceUrl?: string;
   name: string;
   position: string;
   age: SourceCellNumber;
@@ -83,15 +127,25 @@ export interface SourcePlayer {
   shooting: {
     avgDistance: SourceCellNumber;
     pctFga2p: SourceCellNumber;
+    pctFga00_03: SourceCellNumber;
+    pctFga03_10: SourceCellNumber;
+    pctFga10_16: SourceCellNumber;
+    pctFga16_xx: SourceCellNumber;
     pctFga3p: SourceCellNumber;
     fgPct2p: SourceCellNumber;
+    fgPct00_03: SourceCellNumber;
+    fgPct03_10: SourceCellNumber;
+    fgPct10_16: SourceCellNumber;
+    fgPct16_xx: SourceCellNumber;
     fgPct3p: SourceCellNumber;
     pctAst2p: SourceCellNumber;
     pctAst3p: SourceCellNumber;
     pctFgaDunk: SourceCellNumber;
+    fgDunk: SourceCellNumber;
     pctCorner3: SourceCellNumber;
     corner3Pct: SourceCellNumber;
   };
+  shotLocationProfile: SourceShotLocationProfile | null;
   playByPlay: {
     plusMinusOn: SourceCellNumber;
     plusMinusNet: SourceCellNumber;
@@ -105,6 +159,7 @@ export interface SourcePlayer {
     andOnes: SourceCellNumber;
     ownShotsBlocked: SourceCellNumber;
   };
+  postseason?: SourcePlayerPostseasonProfile | null;
   roster: {
     number: string;
     height: string;
@@ -112,6 +167,18 @@ export interface SourcePlayer {
     birthDate: string;
     college: string;
   };
+}
+
+export interface SourcePlayerPostseasonProfile {
+  games: SourceCellNumber;
+  gamesStarted: SourceCellNumber;
+  minutes: SourceCellNumber;
+  perGame: SourcePlayer["perGame"];
+  totals: SourcePlayer["totals"];
+  per100: SourcePlayer["per100"];
+  advanced: SourcePlayer["advanced"];
+  shooting: SourcePlayer["shooting"];
+  playByPlay: SourcePlayer["playByPlay"];
 }
 
 export interface SourceTeam {
@@ -197,6 +264,19 @@ export interface SourceLeagueDistribution {
   max: number;
 }
 
+export interface SourceLeagueStrength {
+  teamCount: number;
+  qualifiedPlayerCount: number;
+  qualifiedPlayersPerTeam: number;
+  effectiveRotationDepth: number;
+  depthZ: number;
+  qualifiedPlayersPerTeamZ: number;
+  teamCountZ: number;
+  leagueStrengthZ: number;
+  talentPointsPer100: number;
+  modelVersion: string;
+}
+
 export interface SourceLeague {
   season: string;
   seasonEndYear: number;
@@ -231,6 +311,7 @@ export interface SourceLeague {
   };
   distributions: Record<string, SourceLeagueDistribution>;
   playerDistributions: Record<string, SourceLeagueDistribution>;
+  strength: SourceLeagueStrength;
   qualifiedPlayerCount: number;
   teams: SourceLeagueTeam[];
 }
@@ -243,6 +324,28 @@ export interface GeneratedSourceData {
   leagues: SourceLeague[];
 }
 
+export interface SourceTeamCatalogEntry {
+  id: string;
+  name: string;
+  shortName: string;
+  franchise: string;
+  abbr: string;
+  season: string;
+  seasonEndYear: number;
+  team: {
+    wins: SourceCellNumber;
+    losses: SourceCellNumber;
+  };
+}
+
+export interface SourceCatalog {
+  generatedAt: string;
+  manifestVersion: string;
+  sourceProvider: string;
+  teams: SourceTeamCatalogEntry[];
+  leagues: SourceLeague[];
+}
+
 export interface DicePlayerCard {
   id: string;
   teamId: string;
@@ -250,6 +353,10 @@ export interface DicePlayerCard {
   position: string;
   minutes: number;
   useWeight: number;
+  playoffUseWeight: number;
+  playoffWeightSource: "postseason" | "healthy-regular";
+  postseasonGames: number | null;
+  availabilityFactor: number;
   tov: number;
   fd: number;
   threeFrequency: number;
@@ -257,12 +364,23 @@ export interface DicePlayerCard {
   p3: number;
   ft: number;
   andOneChance: number;
+  turnoverProfile: TurnoverProfileSource;
+  liveBallTurnoverChance: number;
+  offensiveFoulTurnoverChance: number;
   astWeight: number;
   orbWeight: number;
   drbWeight: number;
   stlWeight: number;
   blkWeight: number;
   pfWeight: number;
+  shootingFoulWeight: number;
+  playoffAstWeight: number;
+  playoffOrbWeight: number;
+  playoffDrbWeight: number;
+  playoffStlWeight: number;
+  playoffBlkWeight: number;
+  playoffPfWeight: number;
+  playoffShootingFoulWeight: number;
   calibration: {
     offensiveImpact: number;
     defensiveImpact: number;
@@ -304,6 +422,7 @@ export interface DiceTeamCard {
   calibration: {
     leagueSeason: string;
     leagueAverages: SourceLeague["averages"];
+    leagueStrength: SourceLeagueStrength;
     playerOffenseSignal: number;
     playerDefenseSignal: number;
     teamOffenseSignal: number;
@@ -324,7 +443,19 @@ export interface PlayerRangeRow {
   tov: string;
   foul: string;
   shot: string;
+  shotProfile: "location" | "two-three";
+  shotProfileMethod: ShotLocationProfileMethod;
+  shotProfileConfidence: number;
+  turnoverProfile: TurnoverProfileSource;
+  liveBallTurnover: string;
+  offensiveFoulTurnover: string;
+  rim: string;
+  shortMid: string;
+  longMid: string;
   three: string;
+  rimMake: string;
+  shortMidMake: string;
+  longMidMake: string;
   p2: string;
   p3: string;
   ft: string;
@@ -332,6 +463,10 @@ export interface PlayerRangeRow {
   raw: {
     tov: number;
     fd: number;
+    liveBallTurnover: number;
+    offensiveFoulTurnover: number;
+    shotZones: Record<ShotZone, number>;
+    shotMakes: Record<ShotZone, number>;
     three: number;
     p2: number;
     p3: number;
@@ -343,8 +478,11 @@ export interface PlayerRangeRow {
 export interface MatchupCard {
   away: DiceTeamCard;
   home: DiceTeamCard;
+  options: MatchupOptions;
+  context: MatchupContext;
   possessionsEach: number;
   quarters: [number, number, number, number];
+  overtimePossessionsEach: number;
   looseFoulRange: string;
   stealOnTurnoverRange: string;
   awayStatic: TeamMatchupStatic;
@@ -354,12 +492,13 @@ export interface MatchupCard {
   assignments: Record<string, Record<AssignmentEvent, RangeRow[]>>;
 }
 
-export type AssignmentEvent = "Use" | "AST" | "OREB" | "DREB" | "STL" | "BLK" | "PF";
+export type AssignmentEvent = "Use" | "AST" | "OREB" | "DREB" | "STL" | "BLK" | "PF" | "ShootingPF";
 
 export interface TeamMatchupStatic {
   offense: string;
   defense: string;
   orbChance: number;
+  orbByShotZone: Record<ShotZone, number>;
   blockChance: number;
   astMade2: number;
   astMade3: number;
@@ -371,8 +510,21 @@ export interface TeamMatchupStatic {
   threeAttemptScale: number;
   foulEndsPossessionChance: number;
   defenseShotAdjustment: number;
+  contextShotAdjustment: number;
+  playoffLeverageShotAdjustment: number;
+  eraTalentAdjustment: {
+    talentDelta: number;
+    shotMakeAdjustment: number;
+    turnoverAdjustment: number;
+    reboundAdjustment: number;
+  };
+  totalShotAdjustment: number;
   ranges: {
     orb: string;
+    orbRim: string;
+    orbShortMid: string;
+    orbLongMid: string;
+    orbThree: string;
     block: string;
     ast2: string;
     ast3: string;

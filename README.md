@@ -7,12 +7,18 @@ Local-first tabletop basketball dice game studio.
 The repository root is now the v0.6 local web app. The original v0.5.1
 print-and-play package is archived at `legacy/v0.5.1`.
 
-The app is source-first:
+The app is source-first with SQLite as the canonical local store:
 
-- Team and player inputs are fetched from Basketball Reference pages listed in
+- Team and player inputs are discovered and fetched from Basketball Reference pages listed in
   `data/source-manifest.json`.
 - Raw page table extracts are cached in `src/data/bbr/raw`.
-- Normalized app data is generated at `src/data/teams.generated.json`.
+- Normalized relational data is built at `data/basketball-dice.sqlite`.
+- Browser data is exported from SQLite to `public/data/catalog.generated.json`
+  plus one `public/data/teams/{teamId}.json` file per team, so the app can load
+  only the selected teams.
+- `data/teams.generated.json` is still exported as a local derived audit/SQLite
+  input artifact, but it is intentionally ignored because the split browser
+  files and SQLite database are the committed runtime data.
 - The dice engine keeps the v0.5 possession model: possession counts, loose
   fouls, usage rolls, turnover/foul/shot action ranges, shot type rolls,
   make rolls, assists, blocks, rebounds, offensive-rebound extensions, and
@@ -24,7 +30,7 @@ The app is source-first:
 
 ```bash
 npm install
-npm run fetch:data
+npm run data:refresh
 npm run dev
 ```
 
@@ -32,20 +38,18 @@ Open the printed local URL to use the app.
 
 ## Data Fetching
 
-`npm run fetch:data` uses the `agent-browser` CLI to open each Basketball
-Reference team-season page, extract all rendered stat tables, write raw JSON,
-and regenerate the normalized offline data bundle.
+`npm run discover:data -- --start-year=1990 --end-year=2025 --use-cache`
+discovers the Basketball Reference team-season manifest.
 
-Initial source teams:
+`npm run fetch:data -- --use-cache` uses the `agent-browser` CLI to open each
+Basketball Reference team-season page, extract all rendered stat tables, write
+raw JSON, and regenerate the normalized offline data bundle.
 
-- 2024-25 Oklahoma City Thunder
-- 2024-25 New York Knicks
-- 2024-25 Boston Celtics
-- 2024-25 Denver Nuggets
-- 1992-93 Phoenix Suns
-- 1992-93 Chicago Bulls
-- 2020-21 Phoenix Suns
-- 2020-21 Milwaukee Bucks
+`npm run data:sqlite` rebuilds the canonical SQLite database from the normalized
+bundle. `npm run data:export-json` exports browser catalog/team files plus the
+local generated JSON back out of SQLite. `npm run data:validate` checks SQLite,
+source coverage, and browser export parity. `npm run data:refresh` runs the full
+discover, fetch, SQLite build, export, and validation pipeline.
 
 ## Scripts
 
@@ -53,5 +57,10 @@ Initial source teams:
 npm run dev        # start local app
 npm run build      # type-check and build
 npm run preview    # preview production build
-npm run fetch:data # refresh Basketball Reference source cache
+npm run discover:data -- --start-year=1990 --end-year=2025 --use-cache
+npm run fetch:data -- --use-cache
+npm run data:sqlite
+npm run data:export-json
+npm run data:validate
+npm run data:refresh
 ```
