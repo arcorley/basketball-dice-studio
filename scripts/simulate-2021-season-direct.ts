@@ -23,6 +23,7 @@ type Conference = "East" | "West";
 type ChunkInput = {
   iterations: number;
   seed: number;
+  rosterMode: RosterMode;
 };
 
 type ChunkOutput = {
@@ -96,10 +97,13 @@ type PlayerRole = {
   pfWeight: number;
 };
 
+type RosterMode = "healthy" | "availability";
+type ProfileSource = "season-games" | "playoff-tables" | "generic-playoff" | "healthy-season" | "healthy-playoff" | "healthy-generic-playoff";
+
 type TeamAvailabilityProfile = {
   team: DiceTeamCard;
   context: "regularSeason" | "postseason";
-  source: "season-games" | "playoff-tables" | "generic-playoff";
+  source: ProfileSource;
   paceFactor: number;
   minActivePlayers: number;
   roles: PlayerRole[];
@@ -114,6 +118,7 @@ const scriptPath = fileURLToPath(import.meta.url);
 const regularSeasonEnd = Date.UTC(2021, 4, 16, 23, 59, 59);
 const defaultSeasonIterations = 10_000;
 const defaultSeed = 4242;
+const defaultRosterMode: RosterMode = "healthy";
 const maxWorkerCount = Math.max(1, os.availableParallelism?.() ?? os.cpus().length);
 const defaultWorkerCount = Math.max(1, Math.min(maxWorkerCount, 8));
 
@@ -260,6 +265,28 @@ function seasonRole(player: DiceTeamCard["players"][number], teamGames: number):
   };
 }
 
+function zeroRole(player: DiceTeamCard["players"][number], teamGames: number): PlayerRole {
+  return {
+    ...seasonRole(player, teamGames),
+    availability: 0,
+    minutes: 0,
+    useWeight: 0,
+    astWeight: 0,
+    orbWeight: 0,
+    drbWeight: 0,
+    stlWeight: 0,
+    blkWeight: 0,
+    pfWeight: 0
+  };
+}
+
+function healthySeasonRole(player: DiceTeamCard["players"][number], teamGames: number): PlayerRole {
+  return {
+    ...seasonRole(player, teamGames),
+    availability: 1
+  };
+}
+
 function postRoleFromTables(player: DiceTeamCard["players"][number], totals: Record<string, { text?: string } | undefined>, teamPostGames: number): PlayerRole {
   const postGames = clamp(requiredNumber(rawNumber(totals, "games"), `${player.name} playoff games`), 0, teamPostGames);
   if (postGames <= 0) {
@@ -293,6 +320,17 @@ function postRoleFromTables(player: DiceTeamCard["players"][number], totals: Rec
   };
 }
 
+function healthyPostRoleFromTables(
+  player: DiceTeamCard["players"][number],
+  totals: Record<string, { text?: string } | undefined>,
+  teamPostGames: number
+): PlayerRole {
+  return {
+    ...postRoleFromTables(player, totals, teamPostGames),
+    availability: 1
+  };
+}
+
 function genericPlayoffRole(player: DiceTeamCard["players"][number], teamGames: number, isCore: boolean): PlayerRole {
   const role = seasonRole(player, teamGames);
   if (isCore) {
@@ -312,23 +350,94 @@ function genericPlayoffRole(player: DiceTeamCard["players"][number], teamGames: 
   };
 }
 
-function buildRegularSeasonProfile(team: DiceTeamCard): TeamAvailabilityProfile {
+function healthyGenericPlayoffRole(player: DiceTeamCard["players"][number], teamGames: number, isCore: boolean): PlayerRole {
+  const role = healthySeasonRole(player, teamGames);
+  if (isCore) {
+    return { ...role, minutes: role.minutes * 1.08 };
+  }
+  return {
+    ...role,
+    availability: 0.35,
+    minutes: role.minutes * 0.55,
+    useWeight: role.useWeight * 0.55,
+    astWeight: role.astWeight * 0.55,
+    orbWeight: role.orbWeight * 0.55,
+    drbWeight: role.drbWeight * 0.55,
+    stlWeight: role.stlWeight * 0.55,
+    blkWeight: role.blkWeight * 0.55,
+    pfWeight: role.pfWeight * 0.55
+  };
+}
+
+function regularSeasonGames(player: DiceTeamCard["players"][number]): number {
+  return requiredNumber(player.source.games, `${player.name} games`);
+}
+
+function regularSeasonMinutes(player: DiceTeamCard["players"][number]): number {
+  return requiredNumber(player.source.minutes, `${player.name} minutes`);
+}
+
+function regularSeasonMinutesPerGame(player: DiceTeamCard["players"][number]): number {
+  return regularSeasonMinutes(player) / Math.max(1, regularSeasonGames(player));
+}
+
+function playoffCore(team: DiceTeamCard, teamGames: number): Set<string> {
+  return new Set(
+    [...team.players]
+      .sort((a, b) => regularSeasonMinutesPerGame(b) - regularSeasonMinutesPerGame(a) || regularSeasonMinutes(b) - regularSeasonMinutes(a))
+      .slice(0, 9)
+      .map((player) => player.name)
+  );
+}
+
+function likelyHealthyPostseasonAddition(player: DiceTeamCard["players"][number], teamGames: number): boolean {
+  const games = regularSeasonGames(player);
+  const minutes = regularSeasonMinutes(player);
+  const minutesPerGame = minutes / Math.max(1, games);
+  return games >= teamGames * 0.45 && minutes >= 900 && minutesPerGame >= 24;
+}
+
+function activeRoleCount(roles: PlayerRole[]): number {
+  return roles.filter((role) => role.availability > 0 && role.minutes > 0).length;
+}
+
+function buildRegularSeasonProfile(team: DiceTeamCard, rosterMode: RosterMode): TeamAvailabilityProfile {
   const games = teamSourceGames(team);
+  const roles = team.players.map((player) => (rosterMode === "healthy" ? healthySeasonRole(player, games) : seasonRole(player, games)));
   return {
     team,
     context: "regularSeason",
-    source: "season-games",
+    source: rosterMode === "healthy" ? "healthy-season" : "season-games",
     paceFactor: 1,
     minActivePlayers: Math.min(8, team.players.length),
-    roles: team.players.map((player) => seasonRole(player, games)),
+    roles,
     cache: new Map()
   };
 }
 
-function buildPostseasonProfile(team: DiceTeamCard): TeamAvailabilityProfile {
+function buildPostseasonProfile(team: DiceTeamCard, rosterMode: RosterMode): TeamAvailabilityProfile {
   const totalsPost = rowsByName(rawTable(team.id, "totals_stats_post"));
   const postGames = Math.max(0, ...[...totalsPost.values()].map((row) => rawNumber(row, "games") ?? 0));
   const teamGames = teamSourceGames(team);
+  if (rosterMode === "healthy" && postGames > 0) {
+    const playoffNames = new Set(totalsPost.keys());
+    const roles = team.players.map((player) => {
+      const row = totalsPost.get(player.name);
+      if (row) return healthyPostRoleFromTables(player, row, postGames);
+      if (likelyHealthyPostseasonAddition(player, teamGames)) return healthyGenericPlayoffRole(player, teamGames, true);
+      return zeroRole(player, teamGames);
+    });
+    return {
+      team,
+      context: "postseason",
+      source: "healthy-playoff",
+      paceFactor: 0.965,
+      minActivePlayers: Math.min(8, activeRoleCount(roles) || playoffNames.size),
+      roles,
+      cache: new Map()
+    };
+  }
+
   if (postGames > 0) {
     return {
       team,
@@ -338,33 +447,33 @@ function buildPostseasonProfile(team: DiceTeamCard): TeamAvailabilityProfile {
       minActivePlayers: Math.min(8, totalsPost.size),
       roles: team.players.map((player) => {
         const row = totalsPost.get(player.name);
-        return row ? postRoleFromTables(player, row, postGames) : { ...seasonRole(player, teamGames), availability: 0, minutes: 0, useWeight: 0 };
+        return row ? postRoleFromTables(player, row, postGames) : zeroRole(player, teamGames);
       }),
       cache: new Map()
     };
   }
 
-  const core = new Set(
-    [...team.players]
-      .sort((a, b) => requiredNumber(b.source.minutes, `${b.name} minutes`) - requiredNumber(a.source.minutes, `${a.name} minutes`))
-      .slice(0, 9)
-      .map((player) => player.name)
-  );
+  const core = playoffCore(team, teamGames);
   return {
     team,
     context: "postseason",
-    source: "generic-playoff",
+    source: rosterMode === "healthy" ? "healthy-generic-playoff" : "generic-playoff",
     paceFactor: 0.965,
     minActivePlayers: Math.min(8, team.players.length),
-    roles: team.players.map((player) => genericPlayoffRole(player, teamGames, core.has(player.name))),
+    roles: team.players.map((player) =>
+      rosterMode === "healthy" ? healthyGenericPlayoffRole(player, teamGames, core.has(player.name)) : genericPlayoffRole(player, teamGames, core.has(player.name))
+    ),
     cache: new Map()
   };
 }
 
-function buildAvailabilityRuntime(teams: Map<string, DiceTeamCard>, context: "regularSeason" | "postseason"): AvailabilityRuntime {
+function buildAvailabilityRuntime(teams: Map<string, DiceTeamCard>, context: "regularSeason" | "postseason", rosterMode: RosterMode): AvailabilityRuntime {
   return {
     profiles: new Map(
-      [...teams.values()].map((team) => [team.id, context === "regularSeason" ? buildRegularSeasonProfile(team) : buildPostseasonProfile(team)])
+      [...teams.values()].map((team) => [
+        team.id,
+        context === "regularSeason" ? buildRegularSeasonProfile(team, rosterMode) : buildPostseasonProfile(team, rosterMode)
+      ])
     )
   };
 }
@@ -633,13 +742,13 @@ function simulatePostseason(
   };
 }
 
-function simulateChunk(iterations: number, seed: number): ChunkOutput {
+function simulateChunk(iterations: number, seed: number, rosterMode: RosterMode): ChunkOutput {
   const games = loadRegularSeasonGames();
   const teams = teamMap();
   const teamIds = [...teams.keys()].sort();
   const conferenceByTeamId = new Map(teamIds.map((teamId) => [teamId, conferenceForAbbr(teams.get(teamId)?.abbr ?? "")]));
-  const regularSeasonRuntime = buildAvailabilityRuntime(teams, "regularSeason");
-  const postseasonRuntime = buildAvailabilityRuntime(teams, "postseason");
+  const regularSeasonRuntime = buildAvailabilityRuntime(teams, "regularSeason", rosterMode);
+  const postseasonRuntime = buildAvailabilityRuntime(teams, "postseason", rosterMode);
   const scheduledGames = games.map((game) => {
     const awayId = teamIdFromAbbr(game.visitorAbbr);
     const homeId = teamIdFromAbbr(game.homeAbbr);
@@ -750,7 +859,7 @@ function simulateChunk(iterations: number, seed: number): ChunkOutput {
   };
 }
 
-function buildChunks(seasonIterations: number, seed: number, workerCount: number): ChunkInput[] {
+function buildChunks(seasonIterations: number, seed: number, workerCount: number, rosterMode: RosterMode): ChunkInput[] {
   const chunkCount = Math.min(seasonIterations, Math.max(workerCount, workerCount * 16));
   const base = Math.floor(seasonIterations / chunkCount);
   let remainder = seasonIterations % chunkCount;
@@ -760,7 +869,7 @@ function buildChunks(seasonIterations: number, seed: number, workerCount: number
   for (let index = 0; index < chunkCount; index += 1) {
     const iterations = base + (remainder > 0 ? 1 : 0);
     remainder -= remainder > 0 ? 1 : 0;
-    chunks.push({ iterations, seed: rng.pickSeed() });
+    chunks.push({ iterations, seed: rng.pickSeed(), rosterMode });
   }
 
   return chunks.filter((chunk) => chunk.iterations > 0);
@@ -818,14 +927,16 @@ async function runWithConcurrency<T, R>(items: T[], concurrency: number, run: (i
   return results;
 }
 
-async function simulateDirectSeasons(seasonIterations: number, seed: number, workerCount: number): Promise<ChunkOutput> {
-  const chunks = buildChunks(seasonIterations, seed, workerCount);
+async function simulateDirectSeasons(seasonIterations: number, seed: number, workerCount: number, rosterMode: RosterMode): Promise<ChunkOutput> {
+  const chunks = buildChunks(seasonIterations, seed, workerCount, rosterMode);
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "basketball-dice-direct-"));
   let completedChunks = 0;
   let completedIterations = 0;
   const started = Date.now();
 
-  console.log(`Running ${seasonIterations.toLocaleString()} direct full-engine seasons in ${chunks.length} chunks across ${workerCount} workers...`);
+  console.log(
+    `Running ${seasonIterations.toLocaleString()} ${rosterMode} direct full-engine seasons in ${chunks.length} chunks across ${workerCount} workers...`
+  );
   try {
     const outputs = await runWithConcurrency(
       chunks,
@@ -1011,11 +1122,48 @@ function bracketPlacementRows(output: ChunkOutput): Array<Record<string, string 
     .sort((a, b) => Number(b.playoffsPct) - Number(a.playoffsPct) || String(a.conference).localeCompare(String(b.conference)) || String(a.team).localeCompare(String(b.team)));
 }
 
-function defaultReportPath(seasonIterations: number, seed: number): string {
-  return path.join(process.cwd(), "reports", `2021-season-direct-${seasonIterations}-availability-seed-${seed}.json`);
+function isRosterMode(value: string | undefined): value is RosterMode {
+  return value === "healthy" || value === "availability";
 }
 
-function writeJsonReport(output: ChunkOutput, workerCount: number, seed: number, outputPath: string): void {
+function parseRosterMode(value: string | undefined): RosterMode {
+  if (!value) return defaultRosterMode;
+  if (isRosterMode(value)) return value;
+  throw new Error(`Unknown roster mode "${value}". Expected "healthy" or "availability".`);
+}
+
+function rosterModelDescription(rosterMode: RosterMode): Record<string, string> {
+  if (rosterMode === "healthy") {
+    return {
+      regularSeason:
+        "Healthy counterfactual: all generated rotation players are active every regular-season game; roles use per-active-game regular-season workload.",
+      postseason:
+        "Healthy counterfactual: actual playoff rosters anchor rotations when available, playoff absences are ignored, and high-minute regular-season players missing from playoff tables are added back.",
+      shootingSkill: "Player shot-making remains based on larger regular-season samples to avoid overfitting small playoff shooting percentages."
+    };
+  }
+
+  return {
+    regularSeason:
+      "Per-game active rosters sampled from sourced Basketball Reference regular-season games played; active roles scale from per-active-game season load.",
+    postseason:
+      "Actual playoff teams use sourced Basketball Reference playoff games, minutes, and totals for availability and role. Non-playoff teams use a generic tightened playoff rotation from regular-season availability.",
+    shootingSkill: "Player shot-making remains based on larger regular-season samples to avoid overfitting small playoff shooting percentages."
+  };
+}
+
+function rosterModelConsoleSummary(rosterMode: RosterMode): string {
+  if (rosterMode === "healthy") {
+    return "Roster mode: healthy counterfactual; regular season and playoffs ignore injury absences while preserving sourced roles.";
+  }
+  return "Roster mode: availability replay; regular-season games sample active rosters and playoffs use sourced playoff availability where available.";
+}
+
+function defaultReportPath(seasonIterations: number, seed: number, rosterMode: RosterMode): string {
+  return path.join(process.cwd(), "reports", `2021-season-direct-${seasonIterations}-${rosterMode}-seed-${seed}.json`);
+}
+
+function writeJsonReport(output: ChunkOutput, workerCount: number, seed: number, rosterMode: RosterMode, outputPath: string): void {
   const games = loadRegularSeasonGames();
   const teams = [...teamMap().values()];
   const summary = summarize(output);
@@ -1029,12 +1177,8 @@ function writeJsonReport(output: ChunkOutput, workerCount: number, seed: number,
       regularSeasonGamesPerSeason: games.length,
       directGamesSimulated: games.length * output.iterations,
       brokenTies: output.brokenTies,
-      availabilityModel: {
-        regularSeason: "Per-game active rosters sampled from sourced Basketball Reference regular-season games played; active roles scale from per-active-game season load.",
-        postseason:
-          "Actual playoff teams use sourced Basketball Reference playoff games, minutes, and totals for availability and role. Non-playoff teams use a generic tightened playoff rotation from regular-season availability.",
-        shootingSkill: "Player shot-making remains based on larger regular-season samples to avoid overfitting small playoff shooting percentages."
-      }
+      rosterMode,
+      rosterModel: rosterModelDescription(rosterMode)
     },
     teams: teams.map((team) => ({
       teamId: team.id,
@@ -1076,7 +1220,7 @@ function writeJsonReport(output: ChunkOutput, workerCount: number, seed: number,
   console.log(`Saved reusable JSON report: ${outputPath}`);
 }
 
-function printReport(output: ChunkOutput, workerCount: number): void {
+function printReport(output: ChunkOutput, workerCount: number, rosterMode: RosterMode): void {
   const games = loadRegularSeasonGames();
   const teams = [...teamMap().values()];
   const { summaries, metrics, topSixAccuracy, topTenAccuracy } = summarize(output);
@@ -1085,9 +1229,7 @@ function printReport(output: ChunkOutput, workerCount: number): void {
   console.log(`2020-21 direct full-engine season sim: ${output.iterations.toLocaleString()} seasons`);
   console.log(`Schedule: ${games.length} regular-season games; ${(games.length * output.iterations).toLocaleString()} direct games simulated.`);
   console.log(`Parallelism: ${workerCount} workers. Randomly resolved engine ties: ${output.brokenTies.toLocaleString()}.`);
-  console.log(
-    "Availability: regular-season games sample active rosters from games played; postseason uses a separate playoff rotation/availability model."
-  );
+  console.log(rosterModelConsoleSummary(rosterMode));
   console.log(
     `Accuracy: MAE ${fixed(metrics.meanAbsoluteWinError, 2)} wins, RMSE ${fixed(metrics.rootMeanSquareWinError, 2)}, max error ${fixed(
       metrics.maxAbsoluteWinError,
@@ -1162,25 +1304,56 @@ function runWorker(inputPath: string | undefined, outputPath: string | undefined
     throw new Error("Worker mode requires input and output JSON paths.");
   }
   const input = JSON.parse(fs.readFileSync(inputPath, "utf8")) as ChunkInput;
-  const output = simulateChunk(input.iterations, input.seed);
+  const output = simulateChunk(input.iterations, input.seed, input.rosterMode ?? defaultRosterMode);
   fs.writeFileSync(outputPath, JSON.stringify(output));
 }
 
-async function main(): Promise<void> {
-  const [seasonIterationsArg, seedArg, workerCountArg, outputPathArg] = process.argv.slice(2);
+function parseMainArgs(args: string[]): { seasonIterations: number; seed: number; workerCount: number; rosterMode: RosterMode; outputPath: string } {
+  const positional: string[] = [];
+  let rosterMode = defaultRosterMode;
+
+  for (const arg of args) {
+    if (arg.startsWith("--mode=")) {
+      rosterMode = parseRosterMode(arg.slice("--mode=".length));
+    } else if (arg === "--healthy") {
+      rosterMode = "healthy";
+    } else if (arg === "--availability") {
+      rosterMode = "availability";
+    } else {
+      positional.push(arg);
+    }
+  }
+
+  const [seasonIterationsArg, seedArg, workerCountArg, outputPathOrModeArg, positionalModeArg] = positional;
+  let outputPathArg = outputPathOrModeArg;
+  if (isRosterMode(outputPathOrModeArg)) {
+    rosterMode = outputPathOrModeArg;
+    outputPathArg = undefined;
+  }
+  if (positionalModeArg !== undefined) {
+    rosterMode = parseRosterMode(positionalModeArg);
+  }
+
   const seasonIterations = Number(seasonIterationsArg ?? defaultSeasonIterations);
   const seed = Number(seedArg ?? defaultSeed);
   const requestedWorkers = Number(workerCountArg ?? defaultWorkerCount);
   const workerCount = Math.max(1, Math.min(Number.isFinite(requestedWorkers) ? Math.floor(requestedWorkers) : defaultWorkerCount, maxWorkerCount));
-  const outputPath = path.resolve(outputPathArg ?? defaultReportPath(seasonIterations, seed));
+  const outputPath = path.resolve(outputPathArg ?? defaultReportPath(seasonIterations, seed, rosterMode));
 
   if (![seasonIterations, seed, workerCount].every(Number.isFinite) || seasonIterations <= 0 || workerCount <= 0) {
-    throw new Error("Usage: npm run simulate:2021-season:direct -- <seasonIterations=10000> <seed=4242> <workers=auto> <outputPath=reports/...json>");
+    throw new Error(
+      "Usage: npm run simulate:2021-season:direct -- <seasonIterations=10000> <seed=4242> <workers=auto> <outputPath=reports/...json> <mode=healthy|availability>"
+    );
   }
 
-  const output = await simulateDirectSeasons(seasonIterations, seed, workerCount);
-  writeJsonReport(output, workerCount, seed, outputPath);
-  printReport(output, workerCount);
+  return { seasonIterations, seed, workerCount, rosterMode, outputPath };
+}
+
+async function main(): Promise<void> {
+  const { seasonIterations, seed, workerCount, rosterMode, outputPath } = parseMainArgs(process.argv.slice(2));
+  const output = await simulateDirectSeasons(seasonIterations, seed, workerCount, rosterMode);
+  writeJsonReport(output, workerCount, seed, rosterMode, outputPath);
+  printReport(output, workerCount, rosterMode);
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === scriptPath) {
