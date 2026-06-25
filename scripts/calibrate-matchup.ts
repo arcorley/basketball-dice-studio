@@ -32,19 +32,24 @@ function sourceGames(team: DiceTeamCard): number {
   return wins + losses;
 }
 
-function sourceTeamLine(team: DiceTeamCard) {
+function sourceTeamLine(team: DiceTeamCard, paceTarget?: number) {
   const games = sourceGames(team);
   const totals = team.source.team.totals;
+  const sourcePace = team.source.team.pace;
+  if (paceTarget !== undefined && (sourcePace === null || sourcePace === undefined || !Number.isFinite(sourcePace) || sourcePace <= 0)) {
+    throw new Error(`Missing source pace for ${team.id}`);
+  }
+  const scale = paceTarget === undefined ? 1 : paceTarget / (sourcePace as number);
   return {
-    pts: perGame(totals.pts, games),
-    fga: perGame(totals.fga, games),
+    pts: perGame(totals.pts, games) * scale,
+    fga: perGame(totals.fga, games) * scale,
     fgPct: rate(totals.fg ?? 0, totals.fga ?? 0),
-    threePa: perGame(totals.fg3a, games),
+    threePa: perGame(totals.fg3a, games) * scale,
     threePct: rate(totals.fg3 ?? 0, totals.fg3a ?? 0),
-    fta: perGame(totals.fta, games),
+    fta: perGame(totals.fta, games) * scale,
     ftPct: rate(totals.ft ?? 0, totals.fta ?? 0),
-    tov: perGame(totals.tov, games),
-    orb: perGame(totals.orb, games)
+    tov: perGame(totals.tov, games) * scale,
+    orb: perGame(totals.orb, games) * scale
   };
 }
 
@@ -58,7 +63,8 @@ function simTeamLine(line: StatLine) {
     fta: Number(line.FTA.toFixed(1)),
     ftPct: rate(line.FTM, line.FTA),
     tov: Number(line.TOV.toFixed(1)),
-    orb: Number(line.OREB.toFixed(1))
+    orb: Number(line.OREB.toFixed(1)),
+    continuationFouls: Number((line.continuation_fouls_drawn ?? 0).toFixed(1))
   };
 }
 
@@ -73,14 +79,25 @@ function deltas(sim: ReturnType<typeof simTeamLine>, source: ReturnType<typeof s
   };
 }
 
-function playerSourceLine(player: SourcePlayer) {
+function playerSourceLine(player: SourcePlayer, team: DiceTeamCard) {
+  const games = sourceGames(team);
   return {
-    pts: player.perGame.pts ?? 0,
-    fga: player.perGame.fga ?? 0,
-    threePa: player.perGame.fg3a ?? 0,
-    fta: player.perGame.fta ?? 0,
-    tov: player.perGame.tov ?? 0,
-    ast: player.perGame.ast ?? 0
+    active: {
+      pts: player.perGame.pts ?? 0,
+      fga: player.perGame.fga ?? 0,
+      threePa: player.perGame.fg3a ?? 0,
+      fta: player.perGame.fta ?? 0,
+      tov: player.perGame.tov ?? 0,
+      ast: player.perGame.ast ?? 0
+    },
+    seasonTeamGame: {
+      pts: fixed(perGame(player.totals.pts, games), 1),
+      fga: fixed(perGame(player.totals.fga, games), 1),
+      threePa: fixed(perGame(player.totals.fg3a, games), 1),
+      fta: fixed(perGame(player.totals.fta, games), 1),
+      tov: fixed(perGame(player.totals.tov, games), 1),
+      ast: fixed(perGame(player.totals.ast, games), 1)
+    }
   };
 }
 
@@ -113,7 +130,9 @@ for (const team of [away, home]) {
   const line = summary.teams[team.id];
   const sim = simTeamLine(line);
   const source = sourceTeamLine(team);
+  const paceAdjustedSource = sourceTeamLine(team, matchup.possessionsEach);
   const matchupRows = team.id === away.id ? matchup.awayPlayerRanges : matchup.homePlayerRanges;
+  const matchupStatic = team.id === away.id ? matchup.awayStatic : matchup.homeStatic;
   const rangeByPlayer = new Map(matchupRows.map((row) => [row.player, row.raw]));
   const wins = summary.wins[team.id] ?? 0;
   console.log(`${team.shortName}: ${wins}-${games - wins - (summary.wins.tie ?? 0)} (${pct(wins / games)})`);
@@ -130,11 +149,19 @@ for (const team of [away, home]) {
           foulDiscipline: fixed(team.foulDiscipline),
           threeTendency: fixed(team.threeTendency),
           orb: fixed(team.orb),
-          drb: fixed(team.drb)
+          drb: fixed(team.drb),
+          turnoverTarget: fixed(matchupStatic.turnoverTargetChance, 1),
+          foulDrawTarget: fixed(matchupStatic.foulDrawTargetChance, 1),
+          threeAttemptTarget: fixed(matchupStatic.threeAttemptTargetChance, 1),
+          turnoverScale: fixed(matchupStatic.turnoverScale, 2),
+          foulDrawScale: fixed(matchupStatic.foulDrawScale, 2),
+          threeAttemptScale: fixed(matchupStatic.threeAttemptScale, 2),
+          foulEndsPossession: fixed(matchupStatic.foulEndsPossessionChance, 1)
         },
         avg: sim,
         source,
-        delta: deltas(sim, source),
+        paceAdjustedSource,
+        delta: deltas(sim, paceAdjustedSource),
         topPlayers: team.players.slice(0, 8).map((player) => {
           const raw = rangeByPlayer.get(player.name);
           return {
@@ -145,12 +172,13 @@ for (const team of [away, home]) {
                   foulDraw: fixed(raw.fd, 1),
                   threeFrequency: fixed(raw.three, 1),
                   p2: fixed(raw.p2, 1),
-                  p3: fixed(raw.p3, 1),
-                  ft: fixed(raw.ft, 1)
-                }
-              : null,
+	                  p3: fixed(raw.p3, 1),
+	                  ft: fixed(raw.ft, 1),
+	                  andOne: fixed(raw.andOne, 1)
+	                }
+	              : null,
             sim: playerSimLine(summary.players[team.id][player.name]),
-            source: playerSourceLine(player.source)
+            source: playerSourceLine(player.source, team)
           };
         })
       },

@@ -256,6 +256,7 @@ export interface DicePlayerCard {
   p2: number;
   p3: number;
   ft: number;
+  andOneChance: number;
   astWeight: number;
   orbWeight: number;
   drbWeight: number;
@@ -327,6 +328,7 @@ export interface PlayerRangeRow {
   p2: string;
   p3: string;
   ft: string;
+  andOne: string;
   raw: {
     tov: number;
     fd: number;
@@ -334,6 +336,7 @@ export interface PlayerRangeRow {
     p2: number;
     p3: number;
     ft: number;
+    andOne: number;
   };
 }
 
@@ -360,12 +363,20 @@ export interface TeamMatchupStatic {
   blockChance: number;
   astMade2: number;
   astMade3: number;
+  turnoverTargetChance: number;
+  foulDrawTargetChance: number;
+  threeAttemptTargetChance: number;
+  turnoverScale: number;
+  foulDrawScale: number;
+  threeAttemptScale: number;
+  foulEndsPossessionChance: number;
   defenseShotAdjustment: number;
   ranges: {
     orb: string;
     block: string;
     ast2: string;
     ast3: string;
+    foulEndsPossession: string;
   };
 }
 

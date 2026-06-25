@@ -216,6 +216,7 @@ function Library({ selectedTeamId, setSelectedTeamId }: { selectedTeamId: string
                   <th>2P</th>
                   <th>3P</th>
                   <th>FT</th>
+                  <th>And-1</th>
                   <th>ASTw</th>
                   <th>REBw</th>
                 </tr>
@@ -233,6 +234,7 @@ function Library({ selectedTeamId, setSelectedTeamId }: { selectedTeamId: string
                     <td>{modifier(player.p2, 1)}</td>
                     <td>{modifier(player.p3, 1)}</td>
                     <td>{modifier(player.ft, 1)}</td>
+                    <td>{modifier(player.andOneChance, 1)}</td>
                     <td>{modifier(player.astWeight, 1)}</td>
                     <td>{modifier(player.orbWeight + player.drbWeight, 1)}</td>
                   </tr>
@@ -387,6 +389,7 @@ function PrintableGameCard({ matchup }: { matchup: MatchupCard }) {
               <th>Offense</th>
               <th>ORB</th>
               <th>BLK</th>
+              <th>Foul End</th>
               <th>AST 2</th>
               <th>AST 3</th>
               <th>Def Adj</th>
@@ -398,6 +401,7 @@ function PrintableGameCard({ matchup }: { matchup: MatchupCard }) {
                 <td>{teamName(row.offense)}</td>
                 <td>{row.ranges.orb}</td>
                 <td>{row.ranges.block}</td>
+                <td>{row.ranges.foulEndsPossession}</td>
                 <td>{row.ranges.ast2}</td>
                 <td>{row.ranges.ast3}</td>
                 <td>{shotAdjustmentLabel(row.defenseShotAdjustment)}</td>
@@ -435,6 +439,7 @@ function PlayerRangesTable({ title, rows }: { title: string; rows: MatchupCard["
             <th>2P Make</th>
             <th>3P Make</th>
             <th>FT</th>
+            <th>And-1</th>
           </tr>
         </thead>
         <tbody>
@@ -449,6 +454,7 @@ function PlayerRangesTable({ title, rows }: { title: string; rows: MatchupCard["
               <td>{row.p2}</td>
               <td>{row.p3}</td>
               <td>{row.ft}</td>
+              <td>{row.andOne}</td>
             </tr>
           ))}
         </tbody>

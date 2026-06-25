@@ -146,9 +146,9 @@ function playerDefensiveImpact(player: SourcePlayer, league: SourceLeague): numb
   ]);
 }
 
-function teamPlayerSignals(players: SourcePlayer[], league: SourceLeague): { offense: number; defense: number } {
-  const weightedOffense = players.map((player) => [playerOffensiveImpact(player, league), minutesPerGame(player)] as [number, number]);
-  const weightedDefense = players.map((player) => [playerDefensiveImpact(player, league), minutesPerGame(player)] as [number, number]);
+function teamPlayerSignals(players: SourcePlayer[], league: SourceLeague, teamGames: number): { offense: number; defense: number } {
+  const weightedOffense = players.map((player) => [playerOffensiveImpact(player, league), seasonMinutesPerTeamGame(player, teamGames)] as [number, number]);
+  const weightedDefense = players.map((player) => [playerDefensiveImpact(player, league), seasonMinutesPerTeamGame(player, teamGames)] as [number, number]);
   return {
     offense: weightedMean(weightedOffense),
     defense: weightedMean(weightedDefense)
@@ -179,23 +179,44 @@ function rotationPlayers(players: SourcePlayer[]): SourcePlayer[] {
   return core.slice(0, 12);
 }
 
-function gamesPlayed(player: SourcePlayer): number {
-  return requiredPositive(player.games, `${player.name} games`);
+function teamGames(source: SourceTeam): number {
+  return requiredPositive(required(source.team.wins, `${source.id} wins`) + required(source.team.losses, `${source.id} losses`), `${source.id} team games`);
 }
 
-function minutesPerGame(player: SourcePlayer): number {
-  return requiredPositive(player.perGame.mp, `${player.name} minutes per game`);
+function seasonTotalPerTeamGame(player: SourcePlayer, field: keyof SourcePlayer["totals"], teamGameCount: number): number {
+  return required(player.totals[field], `${player.name} ${field}`) / teamGameCount;
 }
 
-function perGameTotal(player: SourcePlayer, field: keyof SourcePlayer["totals"]): number {
-  return required(player.totals[field], `${player.name} ${field}`) / gamesPlayed(player);
+function seasonMinutesPerTeamGame(player: SourcePlayer, teamGameCount: number): number {
+  return required(player.minutes, `${player.name} minutes`) / teamGameCount;
 }
 
-function loadWeight(player: SourcePlayer): number {
-  const usage = required(player.advanced.usagePct, `${player.name} usage percentage`);
-  const minutes = minutesPerGame(player);
-  const playmaking = perGameTotal(player, "ast") * 0.18;
-  return Math.max(0.1, usage * minutes + playmaking);
+function loadWeight(player: SourcePlayer, teamGameCount: number): number {
+  const fga = seasonTotalPerTeamGame(player, "fga", teamGameCount);
+  const fta = seasonTotalPerTeamGame(player, "fta", teamGameCount);
+  const tov = seasonTotalPerTeamGame(player, "tov", teamGameCount);
+  return Math.max(0.1, fga + 0.44 * fta + tov);
+}
+
+function sourcedAndOnes(player: SourcePlayer): number | null {
+  const andOnes = player.playByPlay.andOnes;
+  if (!isFiniteNumber(andOnes)) return null;
+  return Math.max(0, andOnes);
+}
+
+function shootingFoulBranchFta(player: SourcePlayer): number {
+  const fta = required(player.totals.fta, `${player.name} FTA`);
+  const andOnes = sourcedAndOnes(player);
+  return andOnes === null ? fta : Math.max(0, fta - andOnes);
+}
+
+function andOneChance(player: SourcePlayer): number {
+  const andOnes = sourcedAndOnes(player);
+  if (andOnes === null) return 0;
+
+  const madeFieldGoals = required(player.totals.fg, `${player.name} made field goals`);
+  if (madeFieldGoals === 0) return 0;
+  return modifier((andOnes / madeFieldGoals) * 100, 0, 35);
 }
 
 function translatedPlayerThreeRate(source: SourceTeam, player: SourcePlayer, league: SourceLeague, neutral: NeutralContext): number {
@@ -217,7 +238,7 @@ function translatedPlayerThreeRate(source: SourceTeam, player: SourcePlayer, lea
 
 function sourcedShootingFoulSignal(player: SourcePlayer): number | null {
   const fga = required(player.totals.fga, `${player.name} FGA`);
-  const fta = required(player.totals.fta, `${player.name} FTA`);
+  const fta = shootingFoulBranchFta(player);
   const drawnShooting = player.playByPlay.drawnShooting;
   if (fga <= 0) {
     if (fta > 0 || (isFiniteNumber(drawnShooting) && drawnShooting > 0)) {
@@ -229,11 +250,12 @@ function sourcedShootingFoulSignal(player: SourcePlayer): number | null {
   const ftaPerFga = fta / fga;
   if (!isFiniteNumber(drawnShooting)) return ftaPerFga;
 
-  const shootingFoulTripsPerFga = drawnShooting / fga;
+  const andOnes = sourcedAndOnes(player) ?? 0;
+  const shootingFoulTripsPerFga = Math.max(0, drawnShooting - andOnes) / fga;
   const shootingFoulFtaEquivalent = shootingFoulTripsPerFga * 2;
   return weightedMean([
-    [ftaPerFga, 0.6],
-    [shootingFoulFtaEquivalent, 0.4]
+    [ftaPerFga, 0.72],
+    [shootingFoulFtaEquivalent, 0.28]
   ]);
 }
 
@@ -252,7 +274,7 @@ function translatedPlayerFtaRate(player: SourcePlayer, league: SourceLeague, neu
   return clamp(playerFtaPerFga * (1 - calibration.foulEraAdaptation) + eraTranslatedRate * calibration.foulEraAdaptation, 0, 0.9);
 }
 
-function playerCard(source: SourceTeam, player: SourcePlayer, league: SourceLeague, neutral: NeutralContext): DicePlayerCard {
+function playerCard(source: SourceTeam, player: SourcePlayer, league: SourceLeague, neutral: NeutralContext, teamGameCount: number): DicePlayerCard {
   const teamId = source.id;
   const fga = required(player.totals.fga, `${player.name} FGA`);
   const fg3a = required(player.totals.fg3a, `${player.name} 3PA`);
@@ -293,7 +315,7 @@ function playerCard(source: SourceTeam, player: SourcePlayer, league: SourceLeag
       : translatedPct(ftPct, fta, league.averages.ftPct, neutral.ftPct, calibration.regressionAttempts.freeThrow, 1);
   const rawThreeRate = fga > 0 ? fg3a / fga : 0;
   const translatedThreeRate = translatedPlayerThreeRate(source, player, league, neutral);
-  const rawFtaRate = fga > 0 ? fta / fga : 0;
+  const rawFtaRate = fga > 0 ? shootingFoulBranchFta(player) / fga : 0;
   const translatedFtaRate = translatedPlayerFtaRate(player, league, neutral);
   const offensiveImpact = playerOffensiveImpact(player, league);
   const defensiveImpact = playerDefensiveImpact(player, league);
@@ -304,19 +326,20 @@ function playerCard(source: SourceTeam, player: SourcePlayer, league: SourceLeag
     name: player.name,
     position: player.position,
     minutes: required(player.minutes, `${player.name} minutes`),
-    useWeight: loadWeight(player) * clamp(1 + offensiveImpact * 0.045, 0.75, 1.28),
+    useWeight: loadWeight(player, teamGameCount) * clamp(1 + offensiveImpact * 0.045, 0.75, 1.28),
     tov: modifier(tovPer100 * 0.9 + tovPct * 0.8, 1, 24),
     fd: modifier(translatedFtaRate * 39, 0, 22),
     threeFrequency: modifier(translatedThreeRate * 100, 0, 95),
     p2: pctToD100(p2Pct),
     p3: pctToD100(p3Pct),
     ft: pctToD100(ftMakePct),
-    astWeight: Math.max(0, perGameTotal(player, "ast")),
-    orbWeight: Math.max(0, perGameTotal(player, "orb")),
-    drbWeight: Math.max(0, perGameTotal(player, "drb")),
-    stlWeight: Math.max(0, perGameTotal(player, "stl")),
-    blkWeight: Math.max(0, perGameTotal(player, "blk")),
-    pfWeight: Math.max(0, perGameTotal(player, "pf")),
+    andOneChance: andOneChance(player),
+    astWeight: Math.max(0, seasonTotalPerTeamGame(player, "ast", teamGameCount)),
+    orbWeight: Math.max(0, seasonTotalPerTeamGame(player, "orb", teamGameCount)),
+    drbWeight: Math.max(0, seasonTotalPerTeamGame(player, "drb", teamGameCount)),
+    stlWeight: Math.max(0, seasonTotalPerTeamGame(player, "stl", teamGameCount)),
+    blkWeight: Math.max(0, seasonTotalPerTeamGame(player, "blk", teamGameCount)),
+    pfWeight: Math.max(0, seasonTotalPerTeamGame(player, "pf", teamGameCount)),
     calibration: {
       offensiveImpact,
       defensiveImpact,
@@ -342,11 +365,12 @@ export function buildDiceTeamCards(sourceTeams: SourceTeam[], leagues: SourceLea
   return sourceTeams.map((source) => {
     const league = leagueFor(source, leaguesByYear);
     const team = source.team;
+    const gameCount = teamGames(source);
     const fg = requiredPositive(team.totals.fg, `${source.id} team FG`);
     const astRate = modifier((required(team.totals.ast, `${source.id} team assists`) / fg) * 100, 15, 95);
     const rotation = rotationPlayers(source.players);
-    const playerSignals = teamPlayerSignals(rotation, league);
-    const players = rotation.map((player) => playerCard(source, player, league, neutral));
+    const playerSignals = teamPlayerSignals(rotation, league, gameCount);
+    const players = rotation.map((player) => playerCard(source, player, league, neutral, gameCount));
 
     const offenseZ = weightedMean([
       [zScore(required(team.offensiveRating, `${source.id} ORtg`), league, "offensiveRating"), 0.36],
@@ -404,10 +428,14 @@ export function buildDiceTeamCards(sourceTeams: SourceTeam[], leagues: SourceLea
 export const derivationNotes = [
   "Team modifiers use full Basketball Reference league distributions for that team season, not the current app library average.",
   "Player impact uses season-level Basketball Reference player advanced distributions for OBPM, DBPM, BPM, usage, TS%, assist, rebound, steal, block, turnover, and FTA/FGA context.",
-  "Individual players drive possession usage and action ranges through sourced active-role minutes per game, usage, makes, attempts, FTA/FGA, drawn shooting fouls when Basketball Reference provides them, TOV%, per-100 stats, assists, rebounds, steals, blocks, and fouls.",
+  "Individual players drive possession usage and action ranges through sourced season contribution per team game, usage context, makes, attempts, FTA/FGA, drawn shooting fouls when Basketball Reference provides them, TOV%, per-100 stats, assists, rebounds, steals, blocks, and fouls.",
   "Matchup cards translate shooting, 3PA share, FT%, and foul draw against the two teams' averaged league environments, so same-era matchups preserve that season and cross-era matchups meet at a midpoint context.",
   "Player shot making is era-relative and volume-regressed from sourced makes and attempts; missing percentages are only accepted when the player had zero sourced attempts.",
   "Foul draw uses sourced FTA/FGA against that season's league FTA/FGA, then team FTA/FGA and opponent FTA/FGA z-scores adjust the matchup.",
+  "Turnover and drawn-foul action ranges are matchup-scaled to sourced offense rates blended with opponent allowed rates, preserving individual player distribution inside the team target.",
+  "3PA checks are matchup-scaled from offense 3PA rate and opponent allowed 3PA rate after both are translated into the matchup era context.",
+  "When Basketball Reference play-by-play tables provide and-one counts, those free throws are modeled on made field goals instead of as separate no-FGA foul possessions.",
+  "Drawn-foul branches use a source-derived foul-end check from the possession equation FGA + weighted FTA - ORB + TOV, letting bonus and continuation free throws preserve realistic shot volume.",
   "Offensive rebound checks use the sourced matchup rate: offense ORB% blended with opponent allowed ORB% from defensive rebound percentage.",
   "SRS, margin context through league distributions, offensive rating, defensive rating, eFG%, turnovers, rebounding, and 3PA rate all contribute to static card modifiers.",
   "Team-level matchup modifiers are preserved as decimal values in the simulator and rounded only when converted into printable d100 ranges."
