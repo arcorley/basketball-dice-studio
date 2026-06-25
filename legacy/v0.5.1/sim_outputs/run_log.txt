@@ -1,0 +1,32 @@
+
+SAMPLE GAME
+===========
+Thunder 117 at Knicks 116
+Possessions per team: 98
+Quarter scores:
+  Q1: Thunder 27, Knicks 35
+  Q2: Thunder 30, Knicks 27
+  Q3: Thunder 34, Knicks 32
+  Q4: Thunder 26, Knicks 22
+
+Sample team totals:
+team    | PTS | FGA | 3PA | FTA | OREB | DREB | AST | STL | BLK | TOV | PF
+--------+-----+-----+-----+-----+------+------+-----+-----+-----+-----+---
+Thunder | 117 | 86  | 40  | 22  | 8    | 36   | 24  | 5   | 1   | 9   | 14
+Knicks  | 116 | 97  | 43  | 20  | 17   | 37   | 27  | 4   | 2   | 8   | 17
+
+Running 10,000 simulations...
+
+BULK SIM TEAM AVERAGES
+======================
+team    | PTS    | ORtg   | FGA   | FG%  | 3PA   | 3P%  | FTA   | OREB  | DREB  | AST   | TOV   | STL  | BLK  | PF   
+--------+--------+--------+-------+------+-------+------+-------+-------+-------+-------+-------+------+------+------
+Knicks  | 110.23 | 112.48 | 89.37 | 0.46 | 33.74 | 0.36 | 19.56 | 12.86 | 34.92 | 24.05 | 11.71 | 5.8  | 1.91 | 18.44
+Thunder | 117.82 | 120.22 | 90.31 | 0.47 | 38.49 | 0.38 | 21.38 | 12.69 | 35.3  | 25.52 | 9.68  | 7.05 | 3.19 | 17.57
+
+Win rates:
+  Thunder: 66.9% (6690/10000)
+  Knicks: 30.9% (3094/10000)
+  Tie: 2.2% (216/10000)
+
+CSV output written to: /mnt/data/basketball_dice_v03_package/sim_outputs

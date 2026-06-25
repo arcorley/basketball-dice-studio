@@ -1,0 +1,86 @@
+{
+  "version": "0.6.0-source-manifest",
+  "primarySource": "Basketball Reference",
+  "teams": [
+    {
+      "id": "2024-25-okc",
+      "name": "2024-25 Oklahoma City Thunder",
+      "shortName": "2024-25 Thunder",
+      "franchise": "Oklahoma City Thunder",
+      "abbr": "OKC",
+      "season": "2024-25",
+      "seasonEndYear": 2025,
+      "sourceUrl": "https://www.basketball-reference.com/teams/OKC/2025.html"
+    },
+    {
+      "id": "2024-25-nyk",
+      "name": "2024-25 New York Knicks",
+      "shortName": "2024-25 Knicks",
+      "franchise": "New York Knicks",
+      "abbr": "NYK",
+      "season": "2024-25",
+      "seasonEndYear": 2025,
+      "sourceUrl": "https://www.basketball-reference.com/teams/NYK/2025.html"
+    },
+    {
+      "id": "2024-25-bos",
+      "name": "2024-25 Boston Celtics",
+      "shortName": "2024-25 Celtics",
+      "franchise": "Boston Celtics",
+      "abbr": "BOS",
+      "season": "2024-25",
+      "seasonEndYear": 2025,
+      "sourceUrl": "https://www.basketball-reference.com/teams/BOS/2025.html"
+    },
+    {
+      "id": "2024-25-den",
+      "name": "2024-25 Denver Nuggets",
+      "shortName": "2024-25 Nuggets",
+      "franchise": "Denver Nuggets",
+      "abbr": "DEN",
+      "season": "2024-25",
+      "seasonEndYear": 2025,
+      "sourceUrl": "https://www.basketball-reference.com/teams/DEN/2025.html"
+    },
+    {
+      "id": "1992-93-pho",
+      "name": "1992-93 Phoenix Suns",
+      "shortName": "1992-93 Suns",
+      "franchise": "Phoenix Suns",
+      "abbr": "PHO",
+      "season": "1992-93",
+      "seasonEndYear": 1993,
+      "sourceUrl": "https://www.basketball-reference.com/teams/PHO/1993.html"
+    },
+    {
+      "id": "1992-93-chi",
+      "name": "1992-93 Chicago Bulls",
+      "shortName": "1992-93 Bulls",
+      "franchise": "Chicago Bulls",
+      "abbr": "CHI",
+      "season": "1992-93",
+      "seasonEndYear": 1993,
+      "sourceUrl": "https://www.basketball-reference.com/teams/CHI/1993.html"
+    },
+    {
+      "id": "2020-21-pho",
+      "name": "2020-21 Phoenix Suns",
+      "shortName": "2020-21 Suns",
+      "franchise": "Phoenix Suns",
+      "abbr": "PHO",
+      "season": "2020-21",
+      "seasonEndYear": 2021,
+      "sourceUrl": "https://www.basketball-reference.com/teams/PHO/2021.html"
+    },
+    {
+      "id": "2020-21-mil",
+      "name": "2020-21 Milwaukee Bucks",
+      "shortName": "2020-21 Bucks",
+      "franchise": "Milwaukee Bucks",
+      "abbr": "MIL",
+      "season": "2020-21",
+      "seasonEndYear": 2021,
+      "sourceUrl": "https://www.basketball-reference.com/teams/MIL/2021.html"
+    }
+  ]
+}
