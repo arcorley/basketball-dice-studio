@@ -1,5 +1,5 @@
 {
-  "fetchedAt": "2026-06-25T03:15:37.865Z",
+  "fetchedAt": "2026-06-25T04:20:29.407Z",
   "heading": "1992-93 Phoenix Suns Roster and Stats",
   "tables": [
     {
@@ -26864,52 +26864,6 @@
             "dataStat": "salary",
             "href": "",
             "text": "$140,000"
-          }
-        }
-      ]
-    },
-    {
-      "caption": "",
-      "headers": [
-        "",
-        "",
-        ""
-      ],
-      "id": "stathead_table",
-      "rows": [
-        {
-          "td": {
-            "dataStat": "",
-            "href": "",
-            "text": "✓"
-          }
-        },
-        {
-          "td": {
-            "dataStat": "",
-            "href": "",
-            "text": "✓ ($9/month)"
-          }
-        },
-        {
-          "td": {
-            "dataStat": "",
-            "href": "",
-            "text": "✓"
-          }
-        },
-        {
-          "td": {
-            "dataStat": "",
-            "href": "",
-            "text": "✓"
-          }
-        },
-        {
-          "td": {
-            "dataStat": "",
-            "href": "",
-            "text": "✓"
           }
         }
       ]

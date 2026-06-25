@@ -10,6 +10,7 @@ import type {
   TeamMatchupStatic
 } from "./types";
 import { SeededRandom } from "./random";
+import { calibration as cardCalibration } from "./teamCards";
 
 export const simParams = {
   globalShotMod: -1,
@@ -28,9 +29,16 @@ export const simParams = {
 };
 
 const statFields = ["PTS", "FGM", "FGA", "3PM", "3PA", "FTM", "FTA", "OREB", "DREB", "REB", "AST", "STL", "BLK", "TOV", "PF"];
+type MatchupPlayerProfile = Pick<DicePlayerCard, "tov" | "fd" | "threeFrequency" | "p2" | "p3" | "ft">;
+
+const matchupProfileCache = new Map<string, MatchupPlayerProfile>();
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
+}
+
+function pctRoll(rng: SeededRandom, chance: number): boolean {
+  return rng.next() * 100 < chance;
 }
 
 function safeRange(start: number, end: number): string {
@@ -54,6 +62,128 @@ export function quarterSplit(possessionsEach: number): [number, number, number, 
     quarters[index] += 1;
   }
   return quarters;
+}
+
+function defenseShotAdjustment(defense: number): number {
+  return defense / simParams.defenseShotDivisor;
+}
+
+function requiredNumber(value: number | null | undefined, label: string): number {
+  if (value === null || value === undefined || !Number.isFinite(value)) {
+    throw new Error(`Missing required Basketball Reference value: ${label}`);
+  }
+  return value;
+}
+
+function matchupContext(offense: DiceTeamCard, defense: DiceTeamCard): DiceTeamCard["calibration"]["leagueAverages"] {
+  const offenseContext = offense.calibration.leagueAverages;
+  const defenseContext = defense.calibration.leagueAverages;
+  return Object.fromEntries(
+    (Object.keys(offenseContext) as Array<keyof typeof offenseContext>).map((key) => [key, (offenseContext[key] + defenseContext[key]) / 2])
+  ) as DiceTeamCard["calibration"]["leagueAverages"];
+}
+
+function translatedRate(
+  observedPct: number,
+  attempts: number,
+  sourceLeaguePct: number,
+  contextPct: number,
+  regressionAttempts: number,
+  dampening: number
+): number {
+  const reliability = attempts / (attempts + regressionAttempts);
+  return clamp(contextPct + (observedPct - sourceLeaguePct) * reliability * dampening, 0.01, 0.99);
+}
+
+function matchupThreeRate(offense: DiceTeamCard, defense: DiceTeamCard, player: DicePlayerCard): number {
+  const fga = requiredNumber(player.source.totals.fga, `${player.name} FGA`);
+  const fg3a = requiredNumber(player.source.totals.fg3a, `${player.name} 3PA`);
+  if (fga === 0) return 0;
+
+  const context = matchupContext(offense, defense);
+  const rawPlayerRate = fg3a / fga;
+  const rawTeamRate = requiredNumber(offense.source.team.threeAttemptRate, `${offense.id} 3PA/FGA`);
+  if (rawTeamRate <= 0) {
+    throw new Error(`${offense.id} has invalid sourced team 3PA/FGA.`);
+  }
+  const translatedTeamRate = clamp(
+    context.threeAttemptRate + (rawTeamRate - offense.calibration.leagueAverages.threeAttemptRate) * 0.55,
+    0.02,
+    0.65
+  );
+  const playerRoleWithinTeam = rawPlayerRate / rawTeamRate;
+  const translatedRoleRate = clamp(translatedTeamRate * playerRoleWithinTeam, 0, 0.95);
+  return clamp(rawPlayerRate * (1 - cardCalibration.threeEraAdaptation) + translatedRoleRate * cardCalibration.threeEraAdaptation, 0, 0.95);
+}
+
+function matchupFreeThrowAttemptRate(offense: DiceTeamCard, defense: DiceTeamCard, player: DicePlayerCard): number {
+  const context = matchupContext(offense, defense);
+  const playerFtaPerFga = player.calibration.rawFreeThrowAttemptRate;
+  if (playerFtaPerFga === 0) return 0;
+
+  const eraTranslatedRate = clamp(
+    context.freeThrowAttemptRate + (playerFtaPerFga - offense.calibration.leagueAverages.freeThrowAttemptRate) * 0.78,
+    0,
+    0.9
+  );
+  return clamp(playerFtaPerFga * (1 - cardCalibration.foulEraAdaptation) + eraTranslatedRate * cardCalibration.foulEraAdaptation, 0, 0.9);
+}
+
+function matchupPlayerProfile(
+  offense: DiceTeamCard,
+  defense: DiceTeamCard,
+  player: DicePlayerCard
+): MatchupPlayerProfile {
+  const cacheKey = `${offense.id}|${defense.id}|${player.id}`;
+  const cached = matchupProfileCache.get(cacheKey);
+  if (cached) return cached;
+
+  const context = matchupContext(offense, defense);
+  const sourceLeague = offense.calibration.leagueAverages;
+  const fg2a = requiredNumber(player.source.totals.fg2a, `${player.name} 2PA`);
+  const fg3a = requiredNumber(player.source.totals.fg3a, `${player.name} 3PA`);
+  const fta = requiredNumber(player.source.totals.fta, `${player.name} FTA`);
+
+  const p2 = translatedRate(
+    player.calibration.rawTwoPointPct,
+    fg2a,
+    sourceLeague.fg2Pct,
+    context.fg2Pct,
+    cardCalibration.regressionAttempts.twoPoint,
+    cardCalibration.playerRelativeShootingDampening
+  );
+  const p3 =
+    player.calibration.rawThreePointPct === null
+      ? 0.01
+      : translatedRate(
+          player.calibration.rawThreePointPct,
+          fg3a,
+          sourceLeague.fg3Pct,
+          context.fg3Pct,
+          cardCalibration.regressionAttempts.threePoint,
+          cardCalibration.playerThreeRelativeDampening
+        );
+  const ft =
+    player.calibration.rawFreeThrowPct === null
+      ? 0.01
+      : translatedRate(player.calibration.rawFreeThrowPct, fta, sourceLeague.ftPct, context.ftPct, cardCalibration.regressionAttempts.freeThrow, 1);
+
+  const profile = {
+    tov: player.tov,
+    fd: clamp(matchupFreeThrowAttemptRate(offense, defense, player) * 39, 0, 22),
+    threeFrequency: clamp(matchupThreeRate(offense, defense, player) * 100, 0, 95),
+    p2: clamp(p2 * 100, 1, 99),
+    p3: clamp(p3 * 100, 1, 99),
+    ft: clamp(ft * 100, 1, 99)
+  };
+  matchupProfileCache.set(cacheKey, profile);
+  return profile;
+}
+
+function matchupOffensiveReboundChance(offense: DiceTeamCard, defense: DiceTeamCard): number {
+  const offenseOrbPct = requiredNumber(offense.source.team.offensiveReboundPct, `${offense.id} offensive rebound percentage`);
+  const opponentAllowedOrbPct = 100 - requiredNumber(defense.source.team.defensiveReboundPct, `${defense.id} defensive rebound percentage`);
+  return clamp((offenseOrbPct + opponentAllowedOrbPct) / 2, 5, 45);
 }
 
 function assignmentWeight(player: DicePlayerCard, event: AssignmentEvent): number {
@@ -125,8 +255,8 @@ function useRangeMap(team: DiceTeamCard): Map<string, string> {
 }
 
 function sideStatic(offense: DiceTeamCard, defense: DiceTeamCard): TeamMatchupStatic {
-  const defenseShotAdjustment = Math.floor(defense.defense / simParams.defenseShotDivisor);
-  const orbChance = clamp(simParams.orbBase + offense.orb - defense.drb, 5, 45);
+  const defAdj = defenseShotAdjustment(defense.defense);
+  const orbChance = matchupOffensiveReboundChance(offense, defense);
   const blockChance = clamp(simParams.blockBase + defense.defense, 0, 40);
   const astMade2 = clamp(offense.assistMade2 + simParams.astMod, 0, 95);
   const astMade3 = clamp(offense.assistMade3 + simParams.astMod, 0, 95);
@@ -137,7 +267,7 @@ function sideStatic(offense: DiceTeamCard, defense: DiceTeamCard): TeamMatchupSt
     blockChance,
     astMade2,
     astMade3,
-    defenseShotAdjustment,
+    defenseShotAdjustment: defAdj,
     ranges: {
       orb: nRange(orbChance),
       block: nRange(blockChance),
@@ -149,26 +279,29 @@ function sideStatic(offense: DiceTeamCard, defense: DiceTeamCard): TeamMatchupSt
 
 export function playerRanges(offense: DiceTeamCard, defense: DiceTeamCard): PlayerRangeRow[] {
   const uses = useRangeMap(offense);
-  const defAdj = Math.floor(defense.defense / simParams.defenseShotDivisor);
+  const defAdj = defenseShotAdjustment(defense.defense);
 
   return offense.players.map((player) => {
-    const tov = clamp(Math.round((player.tov + defense.toPress - offense.toProtect + simParams.globalTovMod) * simParams.tovScale), 0, 40);
-    const fd = clamp(Math.round((player.fd + offense.foulDraw - defense.foulDiscipline + simParams.globalFdMod) * simParams.fdScale), 0, 40);
-    const three = clamp(player.threeFrequency + offense.threeTendency + simParams.threeMod, 0, 95);
-    const p2 = clamp(player.p2 + offense.shotQuality - defAdj + simParams.globalShotMod, 1, 99);
-    const p3 = clamp(player.p3 + offense.shotQuality - defAdj + simParams.globalShotMod, 1, 99);
+    const profile = matchupPlayerProfile(offense, defense, player);
+    const tov = clamp((profile.tov + defense.toPress - offense.toProtect + simParams.globalTovMod) * simParams.tovScale, 0, 40);
+    const fd = clamp((profile.fd + offense.foulDraw - defense.foulDiscipline + simParams.globalFdMod) * simParams.fdScale, 0, 40);
+    const three = clamp(profile.threeFrequency + offense.threeTendency + simParams.threeMod, 0, 95);
+    const p2 = clamp(profile.p2 + offense.shotQuality - defAdj + simParams.globalShotMod, 1, 99);
+    const p3 = clamp(profile.p3 + offense.shotQuality - defAdj + simParams.globalShotMod, 1, 99);
+    const rangeTov = Math.round(tov);
+    const rangeFd = Math.round(fd);
 
     return {
       player: player.name,
       use: uses.get(player.name) ?? "-",
-      tov: safeRange(1, tov),
-      foul: safeRange(tov + 1, tov + fd),
-      shot: safeRange(tov + fd + 1, 100),
+      tov: safeRange(1, rangeTov),
+      foul: safeRange(rangeTov + 1, rangeTov + rangeFd),
+      shot: safeRange(rangeTov + rangeFd + 1, 100),
       three: nRange(three),
       p2: nRange(p2),
       p3: nRange(p3),
-      ft: nRange(player.ft),
-      raw: { tov, fd, three, p2, p3, ft: player.ft }
+      ft: nRange(profile.ft),
+      raw: { tov, fd, three, p2, p3, ft: profile.ft }
     };
   });
 }
@@ -246,7 +379,7 @@ function resolvePossession(
   let extensions = 0;
 
   while (true) {
-    if (simParams.nonshootFoulChance > 0 && rng.int(1, 100) <= simParams.nonshootFoulChance) {
+    if (simParams.nonshootFoulChance > 0 && pctRoll(rng, simParams.nonshootFoulChance)) {
       const fouler = weightedChoice(defense.players, "PF", rng);
       if (fouler) {
         add(defensePlayerStats[fouler.name], "PF");
@@ -256,14 +389,15 @@ function resolvePossession(
     }
 
     const shooter = selectOffensivePlayer(offense, rng);
-    const effectiveTov = clamp(Math.round((shooter.tov + defense.toPress - offense.toProtect + simParams.globalTovMod) * simParams.tovScale), 0, 40);
-    const effectiveFd = clamp(Math.round((shooter.fd + offense.foulDraw - defense.foulDiscipline + simParams.globalFdMod) * simParams.fdScale), 0, 40);
-    const actionRoll = rng.int(1, 100);
+    const shooterProfile = matchupPlayerProfile(offense, defense, shooter);
+    const effectiveTov = clamp((shooterProfile.tov + defense.toPress - offense.toProtect + simParams.globalTovMod) * simParams.tovScale, 0, 40);
+    const effectiveFd = clamp((shooterProfile.fd + offense.foulDraw - defense.foulDiscipline + simParams.globalFdMod) * simParams.fdScale, 0, 40);
+    const actionRoll = rng.next() * 100;
 
-    if (actionRoll <= effectiveTov) {
+    if (actionRoll < effectiveTov) {
       add(offensePlayerStats[shooter.name], "TOV");
       add(offenseTeamStats, "TOV");
-      if (rng.int(1, 100) <= simParams.stealTurnoverPct) {
+      if (pctRoll(rng, simParams.stealTurnoverPct)) {
         const stealer = weightedChoice(defense.players, "STL", rng);
         if (stealer) {
           add(defensePlayerStats[stealer.name], "STL");
@@ -273,7 +407,7 @@ function resolvePossession(
       return;
     }
 
-    if (actionRoll <= effectiveTov + effectiveFd) {
+    if (actionRoll < effectiveTov + effectiveFd) {
       const fouler = weightedChoice(defense.players, "PF", rng);
       if (fouler) {
         add(defensePlayerStats[fouler.name], "PF");
@@ -282,7 +416,7 @@ function resolvePossession(
       for (let shot = 0; shot < 2; shot += 1) {
         add(offensePlayerStats[shooter.name], "FTA");
         add(offenseTeamStats, "FTA");
-        if (rng.int(1, 100) <= shooter.ft) {
+        if (pctRoll(rng, shooterProfile.ft)) {
           add(offensePlayerStats[shooter.name], "FTM");
           add(offensePlayerStats[shooter.name], "PTS");
           add(offenseTeamStats, "FTM");
@@ -292,10 +426,10 @@ function resolvePossession(
       return;
     }
 
-    const threeChance = clamp(shooter.threeFrequency + offense.threeTendency + simParams.threeMod, 0, 95);
-    const isThree = rng.int(1, 100) <= threeChance;
-    const defAdj = Math.floor(defense.defense / simParams.defenseShotDivisor);
-    const makeNumber = clamp((isThree ? shooter.p3 : shooter.p2) + offense.shotQuality - defAdj + simParams.globalShotMod, 1, 99);
+    const threeChance = clamp(shooterProfile.threeFrequency + offense.threeTendency + simParams.threeMod, 0, 95);
+    const isThree = pctRoll(rng, threeChance);
+    const defAdj = defenseShotAdjustment(defense.defense);
+    const makeNumber = clamp((isThree ? shooterProfile.p3 : shooterProfile.p2) + offense.shotQuality - defAdj + simParams.globalShotMod, 1, 99);
 
     add(offensePlayerStats[shooter.name], "FGA");
     add(offenseTeamStats, "FGA");
@@ -304,7 +438,7 @@ function resolvePossession(
       add(offenseTeamStats, "3PA");
     }
 
-    if (rng.int(1, 100) <= makeNumber) {
+    if (pctRoll(rng, makeNumber)) {
       add(offensePlayerStats[shooter.name], "FGM");
       add(offenseTeamStats, "FGM");
       if (isThree) {
@@ -318,7 +452,7 @@ function resolvePossession(
       }
 
       const assistChance = isThree ? offense.assistMade3 : offense.assistMade2;
-      if (rng.int(1, 100) <= clamp(assistChance + simParams.astMod, 0, 95)) {
+      if (pctRoll(rng, clamp(assistChance + simParams.astMod, 0, 95))) {
         const passer = weightedChoice(offense.players, "AST", rng, shooter.name);
         if (passer) {
           add(offensePlayerStats[passer.name], "AST");
@@ -328,7 +462,7 @@ function resolvePossession(
       return;
     }
 
-    if (!isThree && rng.int(1, 100) <= clamp(simParams.blockBase + defense.defense, 0, 40)) {
+    if (!isThree && pctRoll(rng, clamp(simParams.blockBase + defense.defense, 0, 40))) {
       const blocker = weightedChoice(defense.players, "BLK", rng);
       if (blocker) {
         add(defensePlayerStats[blocker.name], "BLK");
@@ -336,8 +470,8 @@ function resolvePossession(
       }
     }
 
-    const orbChance = clamp(simParams.orbBase + offense.orb - defense.drb, 5, 45);
-    if (rng.int(1, 100) <= orbChance && extensions < simParams.maxOrbExtensions) {
+    const orbChance = matchupOffensiveReboundChance(offense, defense);
+    if (pctRoll(rng, orbChance) && extensions < simParams.maxOrbExtensions) {
       const rebounder = weightedChoice(offense.players, "OREB", rng);
       if (rebounder) {
         add(offensePlayerStats[rebounder.name], "OREB");

@@ -1,5 +1,5 @@
 {
-  "fetchedAt": "2026-06-25T03:15:35.133Z",
+  "fetchedAt": "2026-06-25T04:20:26.771Z",
   "heading": "2024-25 Denver Nuggets Roster and Stats",
   "tables": [
     {
@@ -38045,6 +38045,52 @@
             "dataStat": "salary",
             "href": "",
             "text": ""
+          }
+        }
+      ]
+    },
+    {
+      "caption": "",
+      "headers": [
+        "",
+        "",
+        ""
+      ],
+      "id": "stathead_table",
+      "rows": [
+        {
+          "td": {
+            "dataStat": "",
+            "href": "",
+            "text": "✓"
+          }
+        },
+        {
+          "td": {
+            "dataStat": "",
+            "href": "",
+            "text": "✓ ($9/month)"
+          }
+        },
+        {
+          "td": {
+            "dataStat": "",
+            "href": "",
+            "text": "✓"
+          }
+        },
+        {
+          "td": {
+            "dataStat": "",
+            "href": "",
+            "text": "✓"
+          }
+        },
+        {
+          "td": {
+            "dataStat": "",
+            "href": "",
+            "text": "✓"
           }
         }
       ]

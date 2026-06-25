@@ -1,6 +1,23 @@
 {
   "version": "0.6.0-source-manifest",
   "primarySource": "Basketball Reference",
+  "leagueSources": [
+    {
+      "season": "1992-93",
+      "seasonEndYear": 1993,
+      "sourceUrl": "https://www.basketball-reference.com/leagues/NBA_1993.html"
+    },
+    {
+      "season": "2020-21",
+      "seasonEndYear": 2021,
+      "sourceUrl": "https://www.basketball-reference.com/leagues/NBA_2021.html"
+    },
+    {
+      "season": "2024-25",
+      "seasonEndYear": 2025,
+      "sourceUrl": "https://www.basketball-reference.com/leagues/NBA_2025.html"
+    }
+  ],
   "teams": [
     {
       "id": "2024-25-okc",

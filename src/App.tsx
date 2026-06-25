@@ -38,6 +38,16 @@ function pct(num: number, den: number): string {
   return den ? `${((num / den) * 100).toFixed(1)}%` : "-";
 }
 
+function modifier(value: number | undefined, digits = 2): string {
+  if (value === undefined || Number.isNaN(value)) return "-";
+  return value.toFixed(digits);
+}
+
+function shotAdjustmentLabel(value: number): string {
+  const rounded = Math.abs(value).toFixed(1);
+  return value >= 0 ? `-${rounded}` : `+${rounded}`;
+}
+
 function Button(props: React.ButtonHTMLAttributes<HTMLButtonElement> & { icon?: React.ReactNode; variant?: "primary" | "subtle" | "danger" }) {
   const { icon, children, variant = "subtle", className = "", ...rest } = props;
   return (
@@ -180,9 +190,9 @@ function Library({ selectedTeamId, setSelectedTeamId }: { selectedTeamId: string
               ["Pace", formatNumber(selected.pace)],
               ["ORtg", formatNumber(selected.offensiveRating)],
               ["DRtg", formatNumber(selected.defensiveRating)],
-              ["ShotQ", selected.shotQuality],
-              ["DEF", selected.defense],
-              ["3PT Tend", selected.threeTendency],
+              ["ShotQ", modifier(selected.shotQuality)],
+              ["DEF", modifier(selected.defense)],
+              ["3PT Tend", modifier(selected.threeTendency)],
               ["AST 2/3", `${nRange(selected.assistMade2)} / ${nRange(selected.assistMade3)}`],
               ["Rotation", selected.players.length]
             ]}
@@ -217,14 +227,14 @@ function Library({ selectedTeamId, setSelectedTeamId }: { selectedTeamId: string
                     <td>{player.position}</td>
                     <td>{Math.round(player.minutes)}</td>
                     <td>{((player.useWeight / totalUseWeight) * 100).toFixed(1)}</td>
-                    <td>{player.tov}</td>
-                    <td>{player.fd}</td>
-                    <td>{player.threeFrequency}</td>
-                    <td>{player.p2}</td>
-                    <td>{player.p3}</td>
-                    <td>{player.ft}</td>
-                    <td>{Math.round(player.astWeight)}</td>
-                    <td>{Math.round(player.orbWeight + player.drbWeight)}</td>
+                    <td>{modifier(player.tov, 1)}</td>
+                    <td>{modifier(player.fd, 1)}</td>
+                    <td>{modifier(player.threeFrequency, 1)}</td>
+                    <td>{modifier(player.p2, 1)}</td>
+                    <td>{modifier(player.p3, 1)}</td>
+                    <td>{modifier(player.ft, 1)}</td>
+                    <td>{modifier(player.astWeight, 1)}</td>
+                    <td>{modifier(player.orbWeight + player.drbWeight, 1)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -390,7 +400,7 @@ function PrintableGameCard({ matchup }: { matchup: MatchupCard }) {
                 <td>{row.ranges.block}</td>
                 <td>{row.ranges.ast2}</td>
                 <td>{row.ranges.ast3}</td>
-                <td>{row.defenseShotAdjustment >= 0 ? `-${row.defenseShotAdjustment}` : `+${Math.abs(row.defenseShotAdjustment)}`}</td>
+                <td>{shotAdjustmentLabel(row.defenseShotAdjustment)}</td>
               </tr>
             ))}
           </tbody>

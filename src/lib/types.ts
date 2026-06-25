@@ -144,10 +144,12 @@ export interface SourceTeam {
     efgPct: SourceCellNumber;
     turnoverPct: SourceCellNumber;
     offensiveReboundPct: SourceCellNumber;
+    freeThrowAttemptRate: SourceCellNumber;
     freeThrowRate: SourceCellNumber;
     opponentEfgPct: SourceCellNumber;
     opponentTurnoverPct: SourceCellNumber;
     defensiveReboundPct: SourceCellNumber;
+    opponentFreeThrowAttemptRate: SourceCellNumber;
     opponentFreeThrowRate: SourceCellNumber;
     threeAttemptRate: SourceCellNumber;
     totals: Record<string, SourceCellNumber>;
@@ -162,11 +164,83 @@ export interface SourceTeam {
   }>;
 }
 
+export interface SourceLeagueTeam {
+  name: string;
+  wins: SourceCellNumber;
+  losses: SourceCellNumber;
+  pace: SourceCellNumber;
+  offensiveRating: SourceCellNumber;
+  defensiveRating: SourceCellNumber;
+  netRating: SourceCellNumber;
+  simpleRating: SourceCellNumber;
+  marginOfVictory: SourceCellNumber;
+  efgPct: SourceCellNumber;
+  turnoverPct: SourceCellNumber;
+  offensiveReboundPct: SourceCellNumber;
+  freeThrowRate: SourceCellNumber;
+  freeThrowAttemptRate: SourceCellNumber;
+  opponentEfgPct: SourceCellNumber;
+  opponentTurnoverPct: SourceCellNumber;
+  defensiveReboundPct: SourceCellNumber;
+  opponentFreeThrowAttemptRate: SourceCellNumber;
+  opponentFreeThrowRate: SourceCellNumber;
+  threeAttemptRate: SourceCellNumber;
+  fg2Pct: SourceCellNumber;
+  fg3Pct: SourceCellNumber;
+  ftPct: SourceCellNumber;
+}
+
+export interface SourceLeagueDistribution {
+  mean: number;
+  stdev: number;
+  min: number;
+  max: number;
+}
+
+export interface SourceLeague {
+  season: string;
+  seasonEndYear: number;
+  source: {
+    provider: string;
+    url: string;
+    fetchedAt: string;
+    pageTitle: string;
+    h1: string;
+    tableIds: string[];
+  };
+  averages: {
+    pace: number;
+    offensiveRating: number;
+    defensiveRating: number;
+    simpleRating: number;
+    marginOfVictory: number;
+    efgPct: number;
+    turnoverPct: number;
+    offensiveReboundPct: number;
+    freeThrowRate: number;
+    freeThrowAttemptRate: number;
+    opponentEfgPct: number;
+    opponentTurnoverPct: number;
+    defensiveReboundPct: number;
+    opponentFreeThrowAttemptRate: number;
+    opponentFreeThrowRate: number;
+    threeAttemptRate: number;
+    fg2Pct: number;
+    fg3Pct: number;
+    ftPct: number;
+  };
+  distributions: Record<string, SourceLeagueDistribution>;
+  playerDistributions: Record<string, SourceLeagueDistribution>;
+  qualifiedPlayerCount: number;
+  teams: SourceLeagueTeam[];
+}
+
 export interface GeneratedSourceData {
   generatedAt: string;
   manifestVersion: string;
   sourceProvider: string;
   teams: SourceTeam[];
+  leagues: SourceLeague[];
 }
 
 export interface DicePlayerCard {
@@ -188,6 +262,20 @@ export interface DicePlayerCard {
   stlWeight: number;
   blkWeight: number;
   pfWeight: number;
+  calibration: {
+    offensiveImpact: number;
+    defensiveImpact: number;
+    rawThreeRate: number;
+    translatedThreeRate: number;
+    rawFreeThrowAttemptRate: number;
+    translatedFreeThrowAttemptRate: number;
+    rawTwoPointPct: number;
+    translatedTwoPointPct: number;
+    rawThreePointPct: number | null;
+    translatedThreePointPct: number;
+    rawFreeThrowPct: number | null;
+    translatedFreeThrowPct: number;
+  };
   source: SourcePlayer;
 }
 
@@ -212,6 +300,14 @@ export interface DiceTeamCard {
   assistMade2: number;
   assistMade3: number;
   players: DicePlayerCard[];
+  calibration: {
+    leagueSeason: string;
+    leagueAverages: SourceLeague["averages"];
+    playerOffenseSignal: number;
+    playerDefenseSignal: number;
+    teamOffenseSignal: number;
+    teamDefenseSignal: number;
+  };
   source: SourceTeam;
 }
 
