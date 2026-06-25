@@ -8,7 +8,9 @@
     "build": "tsc && vite build",
     "preview": "vite preview --host 127.0.0.1",
     "fetch:data": "node scripts/fetch-bbr-data.mjs",
-    "calibrate:matchup": "tsx scripts/calibrate-matchup.ts"
+    "calibrate:matchup": "tsx scripts/calibrate-matchup.ts",
+    "simulate:2021-season": "tsx scripts/simulate-2021-season.ts",
+    "simulate:2021-season:direct": "tsx scripts/simulate-2021-season-direct.ts"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^5.1.2",

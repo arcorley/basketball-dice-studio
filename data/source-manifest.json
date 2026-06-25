@@ -80,14 +80,164 @@
       "sourceUrl": "https://www.basketball-reference.com/teams/CHI/1993.html"
     },
     {
-      "id": "2020-21-pho",
-      "name": "2020-21 Phoenix Suns",
-      "shortName": "2020-21 Suns",
-      "franchise": "Phoenix Suns",
-      "abbr": "PHO",
+      "id": "2020-21-atl",
+      "name": "2020-21 Atlanta Hawks",
+      "shortName": "2020-21 Hawks",
+      "franchise": "Atlanta Hawks",
+      "abbr": "ATL",
       "season": "2020-21",
       "seasonEndYear": 2021,
-      "sourceUrl": "https://www.basketball-reference.com/teams/PHO/2021.html"
+      "sourceUrl": "https://www.basketball-reference.com/teams/ATL/2021.html"
+    },
+    {
+      "id": "2020-21-bos",
+      "name": "2020-21 Boston Celtics",
+      "shortName": "2020-21 Celtics",
+      "franchise": "Boston Celtics",
+      "abbr": "BOS",
+      "season": "2020-21",
+      "seasonEndYear": 2021,
+      "sourceUrl": "https://www.basketball-reference.com/teams/BOS/2021.html"
+    },
+    {
+      "id": "2020-21-brk",
+      "name": "2020-21 Brooklyn Nets",
+      "shortName": "2020-21 Nets",
+      "franchise": "Brooklyn Nets",
+      "abbr": "BRK",
+      "season": "2020-21",
+      "seasonEndYear": 2021,
+      "sourceUrl": "https://www.basketball-reference.com/teams/BRK/2021.html"
+    },
+    {
+      "id": "2020-21-chi",
+      "name": "2020-21 Chicago Bulls",
+      "shortName": "2020-21 Bulls",
+      "franchise": "Chicago Bulls",
+      "abbr": "CHI",
+      "season": "2020-21",
+      "seasonEndYear": 2021,
+      "sourceUrl": "https://www.basketball-reference.com/teams/CHI/2021.html"
+    },
+    {
+      "id": "2020-21-cho",
+      "name": "2020-21 Charlotte Hornets",
+      "shortName": "2020-21 Hornets",
+      "franchise": "Charlotte Hornets",
+      "abbr": "CHO",
+      "season": "2020-21",
+      "seasonEndYear": 2021,
+      "sourceUrl": "https://www.basketball-reference.com/teams/CHO/2021.html"
+    },
+    {
+      "id": "2020-21-cle",
+      "name": "2020-21 Cleveland Cavaliers",
+      "shortName": "2020-21 Cavaliers",
+      "franchise": "Cleveland Cavaliers",
+      "abbr": "CLE",
+      "season": "2020-21",
+      "seasonEndYear": 2021,
+      "sourceUrl": "https://www.basketball-reference.com/teams/CLE/2021.html"
+    },
+    {
+      "id": "2020-21-dal",
+      "name": "2020-21 Dallas Mavericks",
+      "shortName": "2020-21 Mavericks",
+      "franchise": "Dallas Mavericks",
+      "abbr": "DAL",
+      "season": "2020-21",
+      "seasonEndYear": 2021,
+      "sourceUrl": "https://www.basketball-reference.com/teams/DAL/2021.html"
+    },
+    {
+      "id": "2020-21-den",
+      "name": "2020-21 Denver Nuggets",
+      "shortName": "2020-21 Nuggets",
+      "franchise": "Denver Nuggets",
+      "abbr": "DEN",
+      "season": "2020-21",
+      "seasonEndYear": 2021,
+      "sourceUrl": "https://www.basketball-reference.com/teams/DEN/2021.html"
+    },
+    {
+      "id": "2020-21-det",
+      "name": "2020-21 Detroit Pistons",
+      "shortName": "2020-21 Pistons",
+      "franchise": "Detroit Pistons",
+      "abbr": "DET",
+      "season": "2020-21",
+      "seasonEndYear": 2021,
+      "sourceUrl": "https://www.basketball-reference.com/teams/DET/2021.html"
+    },
+    {
+      "id": "2020-21-gsw",
+      "name": "2020-21 Golden State Warriors",
+      "shortName": "2020-21 Warriors",
+      "franchise": "Golden State Warriors",
+      "abbr": "GSW",
+      "season": "2020-21",
+      "seasonEndYear": 2021,
+      "sourceUrl": "https://www.basketball-reference.com/teams/GSW/2021.html"
+    },
+    {
+      "id": "2020-21-hou",
+      "name": "2020-21 Houston Rockets",
+      "shortName": "2020-21 Rockets",
+      "franchise": "Houston Rockets",
+      "abbr": "HOU",
+      "season": "2020-21",
+      "seasonEndYear": 2021,
+      "sourceUrl": "https://www.basketball-reference.com/teams/HOU/2021.html"
+    },
+    {
+      "id": "2020-21-ind",
+      "name": "2020-21 Indiana Pacers",
+      "shortName": "2020-21 Pacers",
+      "franchise": "Indiana Pacers",
+      "abbr": "IND",
+      "season": "2020-21",
+      "seasonEndYear": 2021,
+      "sourceUrl": "https://www.basketball-reference.com/teams/IND/2021.html"
+    },
+    {
+      "id": "2020-21-lac",
+      "name": "2020-21 Los Angeles Clippers",
+      "shortName": "2020-21 Clippers",
+      "franchise": "Los Angeles Clippers",
+      "abbr": "LAC",
+      "season": "2020-21",
+      "seasonEndYear": 2021,
+      "sourceUrl": "https://www.basketball-reference.com/teams/LAC/2021.html"
+    },
+    {
+      "id": "2020-21-lal",
+      "name": "2020-21 Los Angeles Lakers",
+      "shortName": "2020-21 Lakers",
+      "franchise": "Los Angeles Lakers",
+      "abbr": "LAL",
+      "season": "2020-21",
+      "seasonEndYear": 2021,
+      "sourceUrl": "https://www.basketball-reference.com/teams/LAL/2021.html"
+    },
+    {
+      "id": "2020-21-mem",
+      "name": "2020-21 Memphis Grizzlies",
+      "shortName": "2020-21 Grizzlies",
+      "franchise": "Memphis Grizzlies",
+      "abbr": "MEM",
+      "season": "2020-21",
+      "seasonEndYear": 2021,
+      "sourceUrl": "https://www.basketball-reference.com/teams/MEM/2021.html"
+    },
+    {
+      "id": "2020-21-mia",
+      "name": "2020-21 Miami Heat",
+      "shortName": "2020-21 Heat",
+      "franchise": "Miami Heat",
+      "abbr": "MIA",
+      "season": "2020-21",
+      "seasonEndYear": 2021,
+      "sourceUrl": "https://www.basketball-reference.com/teams/MIA/2021.html"
     },
     {
       "id": "2020-21-mil",
@@ -98,6 +248,136 @@
       "season": "2020-21",
       "seasonEndYear": 2021,
       "sourceUrl": "https://www.basketball-reference.com/teams/MIL/2021.html"
+    },
+    {
+      "id": "2020-21-min",
+      "name": "2020-21 Minnesota Timberwolves",
+      "shortName": "2020-21 Timberwolves",
+      "franchise": "Minnesota Timberwolves",
+      "abbr": "MIN",
+      "season": "2020-21",
+      "seasonEndYear": 2021,
+      "sourceUrl": "https://www.basketball-reference.com/teams/MIN/2021.html"
+    },
+    {
+      "id": "2020-21-nop",
+      "name": "2020-21 New Orleans Pelicans",
+      "shortName": "2020-21 Pelicans",
+      "franchise": "New Orleans Pelicans",
+      "abbr": "NOP",
+      "season": "2020-21",
+      "seasonEndYear": 2021,
+      "sourceUrl": "https://www.basketball-reference.com/teams/NOP/2021.html"
+    },
+    {
+      "id": "2020-21-nyk",
+      "name": "2020-21 New York Knicks",
+      "shortName": "2020-21 Knicks",
+      "franchise": "New York Knicks",
+      "abbr": "NYK",
+      "season": "2020-21",
+      "seasonEndYear": 2021,
+      "sourceUrl": "https://www.basketball-reference.com/teams/NYK/2021.html"
+    },
+    {
+      "id": "2020-21-okc",
+      "name": "2020-21 Oklahoma City Thunder",
+      "shortName": "2020-21 Thunder",
+      "franchise": "Oklahoma City Thunder",
+      "abbr": "OKC",
+      "season": "2020-21",
+      "seasonEndYear": 2021,
+      "sourceUrl": "https://www.basketball-reference.com/teams/OKC/2021.html"
+    },
+    {
+      "id": "2020-21-orl",
+      "name": "2020-21 Orlando Magic",
+      "shortName": "2020-21 Magic",
+      "franchise": "Orlando Magic",
+      "abbr": "ORL",
+      "season": "2020-21",
+      "seasonEndYear": 2021,
+      "sourceUrl": "https://www.basketball-reference.com/teams/ORL/2021.html"
+    },
+    {
+      "id": "2020-21-phi",
+      "name": "2020-21 Philadelphia 76ers",
+      "shortName": "2020-21 76ers",
+      "franchise": "Philadelphia 76ers",
+      "abbr": "PHI",
+      "season": "2020-21",
+      "seasonEndYear": 2021,
+      "sourceUrl": "https://www.basketball-reference.com/teams/PHI/2021.html"
+    },
+    {
+      "id": "2020-21-pho",
+      "name": "2020-21 Phoenix Suns",
+      "shortName": "2020-21 Suns",
+      "franchise": "Phoenix Suns",
+      "abbr": "PHO",
+      "season": "2020-21",
+      "seasonEndYear": 2021,
+      "sourceUrl": "https://www.basketball-reference.com/teams/PHO/2021.html"
+    },
+    {
+      "id": "2020-21-por",
+      "name": "2020-21 Portland Trail Blazers",
+      "shortName": "2020-21 Trail Blazers",
+      "franchise": "Portland Trail Blazers",
+      "abbr": "POR",
+      "season": "2020-21",
+      "seasonEndYear": 2021,
+      "sourceUrl": "https://www.basketball-reference.com/teams/POR/2021.html"
+    },
+    {
+      "id": "2020-21-sac",
+      "name": "2020-21 Sacramento Kings",
+      "shortName": "2020-21 Kings",
+      "franchise": "Sacramento Kings",
+      "abbr": "SAC",
+      "season": "2020-21",
+      "seasonEndYear": 2021,
+      "sourceUrl": "https://www.basketball-reference.com/teams/SAC/2021.html"
+    },
+    {
+      "id": "2020-21-sas",
+      "name": "2020-21 San Antonio Spurs",
+      "shortName": "2020-21 Spurs",
+      "franchise": "San Antonio Spurs",
+      "abbr": "SAS",
+      "season": "2020-21",
+      "seasonEndYear": 2021,
+      "sourceUrl": "https://www.basketball-reference.com/teams/SAS/2021.html"
+    },
+    {
+      "id": "2020-21-tor",
+      "name": "2020-21 Toronto Raptors",
+      "shortName": "2020-21 Raptors",
+      "franchise": "Toronto Raptors",
+      "abbr": "TOR",
+      "season": "2020-21",
+      "seasonEndYear": 2021,
+      "sourceUrl": "https://www.basketball-reference.com/teams/TOR/2021.html"
+    },
+    {
+      "id": "2020-21-uta",
+      "name": "2020-21 Utah Jazz",
+      "shortName": "2020-21 Jazz",
+      "franchise": "Utah Jazz",
+      "abbr": "UTA",
+      "season": "2020-21",
+      "seasonEndYear": 2021,
+      "sourceUrl": "https://www.basketball-reference.com/teams/UTA/2021.html"
+    },
+    {
+      "id": "2020-21-was",
+      "name": "2020-21 Washington Wizards",
+      "shortName": "2020-21 Wizards",
+      "franchise": "Washington Wizards",
+      "abbr": "WAS",
+      "season": "2020-21",
+      "seasonEndYear": 2021,
+      "sourceUrl": "https://www.basketball-reference.com/teams/WAS/2021.html"
     }
   ]
 }
