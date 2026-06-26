@@ -387,11 +387,136 @@ function drawScoresheets(doc: PdfDoc, autoTable: AutoTable, matchup: MatchupCard
   drawTeamScoresheet(doc, autoTable, matchup, matchup.home);
 }
 
+function drawPossessionFlowSheet(doc: PdfDoc, autoTable: AutoTable, matchup: MatchupCard): void {
+  drawPdfTitle(doc, "Possession Flow Sheet", `${matchup.away.shortName} at ${matchup.home.shortName} - ${matchup.context.label}`);
+  const tableWidth = doc.internal.pageSize.getWidth() - 36;
+
+  autoTable(doc, {
+    startY: 54,
+    head: [["Poss/team", "Q Targets", "OT", "Loose Foul", "Counter Rule"]],
+    body: [
+      [
+        String(matchup.possessionsEach),
+        `${matchup.quarters[0]} / ${matchup.quarters[1]} / ${matchup.quarters[2]} / ${matchup.quarters[3]}`,
+        `${matchup.overtimePossessionsEach} per team`,
+        matchup.looseFoulRange,
+        "Mark once at the start. OREB and continuation fouls do not add a possession."
+      ]
+    ],
+    theme: "grid",
+    margin: { left: 18, right: 18 },
+    tableWidth,
+    styles: { font: "helvetica", fontSize: 7.4, cellPadding: 3, lineColor: [160, 166, 162], lineWidth: 0.4, minCellHeight: 13, halign: "center" },
+    headStyles: { fillColor: [31, 45, 40], textColor: [255, 255, 255], fontStyle: "bold", fontSize: 7.1 },
+    columnStyles: {
+      0: { cellWidth: 60 },
+      1: { cellWidth: 86 },
+      2: { cellWidth: 66 },
+      3: { cellWidth: 64 },
+      4: { halign: "left" }
+    },
+    alternateRowStyles: { fillColor: [247, 249, 248] }
+  });
+  const setupBottom = lastAutoTableY(doc, 54);
+
+  autoTable(doc, {
+    startY: setupBottom + 8,
+    head: [["Offense", "Foul End", "AST2", "AST3", "Block", "ORB: R / S / L / 3"]],
+    body: [
+      [matchup.away.shortName, matchup.awayStatic.ranges.foulEndsPossession, matchup.awayStatic.ranges.ast2, matchup.awayStatic.ranges.ast3, matchup.awayStatic.ranges.block, `R ${matchup.awayStatic.ranges.orbRim} / S ${matchup.awayStatic.ranges.orbShortMid} / L ${matchup.awayStatic.ranges.orbLongMid} / 3 ${matchup.awayStatic.ranges.orbThree}`],
+      [matchup.home.shortName, matchup.homeStatic.ranges.foulEndsPossession, matchup.homeStatic.ranges.ast2, matchup.homeStatic.ranges.ast3, matchup.homeStatic.ranges.block, `R ${matchup.homeStatic.ranges.orbRim} / S ${matchup.homeStatic.ranges.orbShortMid} / L ${matchup.homeStatic.ranges.orbLongMid} / 3 ${matchup.homeStatic.ranges.orbThree}`]
+    ],
+    theme: "grid",
+    margin: { left: 18, right: 18 },
+    tableWidth,
+    styles: { font: "helvetica", fontSize: 7, cellPadding: 2.8, lineColor: [160, 166, 162], lineWidth: 0.4, minCellHeight: 15, halign: "center" },
+    headStyles: { fillColor: [31, 45, 40], textColor: [255, 255, 255], fontStyle: "bold", fontSize: 6.7 },
+    columnStyles: {
+      0: { cellWidth: 124, halign: "left", fontStyle: "bold" },
+      1: { cellWidth: 56 },
+      2: { cellWidth: 48 },
+      3: { cellWidth: 48 },
+      4: { cellWidth: 48 },
+      5: { halign: "left" }
+    },
+    alternateRowStyles: { fillColor: [247, 249, 248] }
+  });
+  const referenceBottom = lastAutoTableY(doc, setupBottom + 8);
+
+  autoTable(doc, {
+    startY: referenceBottom + 12,
+    head: [["Stage", "Roll", "Result", "Record / Next"]],
+    body: [
+      ["Start", "No roll", "Add one team possession for the offense.", "Use the quarter target. Do this once."],
+      ["Loose foul", "d100 vs Loose Foul", "Hit: assign defender on defense PF table.", "Record PF, then continue same possession."],
+      ["Use", "Offense Use table", "Selected player becomes action player.", "Use this player's Player Ranges row."],
+      ["Action", "d100 on TOV / Foul / Shot", "The printed range picks the branch.", "TOV, foul draw, or shot resolution."],
+      ["Turnover", "Off Foul TOV, then Live TOV", "Off foul adds PF to offense. Live ball assigns STL.", "Record TOV. Possession ends."],
+      ["Foul draw", "Shoot PF table, 2 FT, Foul Ends", "Yes ends. No creates a continuation shot.", "No extra possession on continuation."],
+      ["Shot", "Zone range, then make range", "Use Rim, Short 2, Long 2, or 3P; then matching make range.", "Record FGA, 3PA, makes, and points."],
+      ["Made shot", "AST 2 or AST 3, then And-1", "Assign AST from offense AST table excluding shooter. And-1 adds Shoot PF plus 1 FT.", "After any and-one FT, possession ends."],
+      ["Missed shot", "BLK on missed 2PA, then ORB", "OREB loops back to loose foul check. DREB ends.", "Max two OREB extensions."]
+    ],
+    theme: "grid",
+    margin: { left: 18, right: 18, bottom: 16 },
+    tableWidth,
+    styles: {
+      font: "helvetica",
+      fontSize: 7.3,
+      cellPadding: { top: 3.2, right: 3, bottom: 3.2, left: 3 },
+      lineColor: [160, 166, 162],
+      lineWidth: 0.45,
+      minCellHeight: 22,
+      overflow: "linebreak",
+      valign: "middle"
+    },
+    headStyles: { fillColor: [31, 45, 40], textColor: [255, 255, 255], fontStyle: "bold", fontSize: 7.1 },
+    columnStyles: {
+      0: { cellWidth: 68, fontStyle: "bold" },
+      1: { cellWidth: 136 },
+      2: { cellWidth: 270 },
+      3: {}
+    },
+    alternateRowStyles: { fillColor: [247, 249, 248] }
+  });
+  const flowBottom = lastAutoTableY(doc, referenceBottom + 12);
+
+  autoTable(doc, {
+    startY: flowBottom + 12,
+    head: [["Ends After", "Continues After", "Range Source"]],
+    body: [
+      [
+        "Turnover; made field goal after AST/and-one checks; foul draw when Foul Ends is Yes; defensive rebound.",
+        "Loose non-shooting foul; offensive rebound; foul draw when Foul Ends is No.",
+        "Use, AST, OREB, DREB, STL, BLK, PF, and Shoot PF use the Assignment Matrix. TOV, Foul, Shot, zone, make, FT, and And-1 use Player Ranges."
+      ]
+    ],
+    theme: "grid",
+    margin: { left: 18, right: 18 },
+    tableWidth,
+    styles: { font: "helvetica", fontSize: 7.4, cellPadding: 4, lineColor: [160, 166, 162], lineWidth: 0.45, minCellHeight: 42, overflow: "linebreak", valign: "top" },
+    headStyles: { fillColor: [31, 45, 40], textColor: [255, 255, 255], fontStyle: "bold", fontSize: 7.1 },
+    columnStyles: { 0: { cellWidth: 220 }, 1: { cellWidth: 220 }, 2: {} }
+  });
+
+  doc.setTextColor(88, 98, 94);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(6.8);
+  doc.text("R = Rim, S = Short 2, L = Long 2. Roll d100; a printed range hit means the result happens.", 18, doc.internal.pageSize.getHeight() - 12);
+}
+
 export async function exportGameCardPdf(matchup: MatchupCard): Promise<void> {
   const { jsPDF, autoTable } = await loadPdfDeps();
   const doc = createLandscapeDoc(jsPDF);
   drawGameCard(doc, autoTable, matchup);
   doc.save(`${matchupFilePrefix(matchup)}_card.pdf`);
+}
+
+export async function exportPossessionFlowPdf(matchup: MatchupCard): Promise<void> {
+  const { jsPDF, autoTable } = await loadPdfDeps();
+  const doc = createLandscapeDoc(jsPDF);
+  drawPossessionFlowSheet(doc, autoTable, matchup);
+  doc.save(`${matchupFilePrefix(matchup)}_possession_flow.pdf`);
 }
 
 export async function exportScoresheetsPdf(matchup: MatchupCard): Promise<void> {
@@ -405,6 +530,8 @@ export async function exportGamePacketPdf(matchup: MatchupCard): Promise<void> {
   const { jsPDF, autoTable } = await loadPdfDeps();
   const doc = createLandscapeDoc(jsPDF);
   drawGameCard(doc, autoTable, matchup);
+  doc.addPage();
+  drawPossessionFlowSheet(doc, autoTable, matchup);
   doc.addPage();
   drawScoresheets(doc, autoTable, matchup);
   doc.save(`${matchupFilePrefix(matchup)}_game_packet.pdf`);

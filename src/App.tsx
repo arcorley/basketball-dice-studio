@@ -32,7 +32,7 @@ import {
   simulateLeagueGameWithTeams,
   standings
 } from "./lib/league";
-import { exportGameCardPdf, exportGamePacketPdf, exportScoresheetsPdf } from "./lib/pdfExport";
+import { exportGameCardPdf, exportGamePacketPdf, exportPossessionFlowPdf, exportScoresheetsPdf } from "./lib/pdfExport";
 import { formatNumber, formatPct, loadDiceTeam, loadSourceCatalog } from "./lib/sourceData";
 import { generalDerivationNotes, teamDerivationNotes } from "./lib/teamCards";
 import { loadSeasonLeague, loadSeasonLeagues, loadTournament, saveSeasonLeagues, saveTournament, type SeasonLeagueCollectionState } from "./lib/storage";
@@ -1565,6 +1565,9 @@ function MatchupStudio({
           </Button>
           <Button icon={<Download size={16} />} onClick={() => void exportGameCardPdf(matchup)}>
             Export Card PDF
+          </Button>
+          <Button data-testid="export-possession-flow-pdf" icon={<Download size={16} />} onClick={() => void exportPossessionFlowPdf(matchup)}>
+            Export Flow PDF
           </Button>
           <Button data-testid="export-scoresheets-pdf" icon={<Download size={16} />} onClick={() => void exportScoresheetsPdf(matchup)}>
             Export Scoresheets PDF
