@@ -3,19 +3,22 @@ import {
   BarChart3,
   BookOpen,
   CalendarDays,
+  Check,
   ChevronLeft,
   ChevronRight,
   Download,
   FileText,
   ListFilter,
   Pause,
+  Pencil,
   Play,
   Plus,
   RotateCcw,
   Search,
   SkipForward,
   Trash2,
-  Trophy
+  Trophy,
+  X
 } from "lucide-react";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
@@ -27,6 +30,9 @@ import {
   createSeasonLeague,
   createTournament,
   markUnplayed,
+  renameLeague,
+  setLeagueCurrentDate,
+  setLeagueFocusTeam,
   setManualLeagueResult,
   setSimulatedLeagueResult,
   simulateLeagueGameWithTeams,
@@ -35,7 +41,7 @@ import {
 import { exportGameCardPdf, exportGamePacketPdf, exportPossessionFlowPdf, exportScoresheetsPdf } from "./lib/pdfExport";
 import { formatNumber, formatPct, loadDiceTeam, loadSourceCatalog } from "./lib/sourceData";
 import { generalDerivationNotes, teamDerivationNotes } from "./lib/teamCards";
-import { loadSeasonLeague, loadSeasonLeagues, loadTournament, saveSeasonLeagues, saveTournament, type SeasonLeagueCollectionState } from "./lib/storage";
+import { loadSeasonLeague, loadSeasonLeagueCollection, loadTournament, saveSeasonLeagues, saveTournament, type SeasonLeagueCollectionState } from "./lib/storage";
 import type {
   DicePlayerCard,
   DiceTeamCard,
@@ -45,6 +51,7 @@ import type {
   MatchupCard,
   MatchupOptions,
   PossessionTrace,
+  SimulationOptions,
   SourceCatalog,
   SourcePlayer,
   SourceTeamCatalogEntry,
@@ -56,7 +63,8 @@ type Tab = "library" | "matchup" | "sim" | "tournament" | "league";
 type PlaySpeed = "manual" | "slow" | "normal" | "fast";
 type SimulatorMode = "play" | "simulate";
 type SimulationRunMode = "single" | "batch";
-type CompetitionSection = "schedule" | "standings" | "leaders";
+type WatchGameView = "game" | "box";
+type CompetitionSection = "schedule" | "standings" | "leaders" | "team";
 type LeaguePreset = "season" | "franchise-best" | "best-record";
 type LeagueStatusFilter = "all" | "unplayed" | "played" | "simulated" | "manual";
 type LeagueViewMode = "select" | "create" | "play";
@@ -64,6 +72,8 @@ type StandingsView = "overall" | "conference" | "division";
 type StandingsConference = "Eastern" | "Western" | "Other";
 type StandingsSeedStatus = "playoff" | "play-in" | "outside";
 type LeaderTableView = "teams" | "players";
+type CardStatsMode = "league" | "source";
+type CardStatDisplayMode = "averages" | "totals";
 type SortDirection = "asc" | "desc";
 type LeaderStatField = "PTS" | "REB" | "AST" | "STL" | "BLK";
 type TeamLeaderSortKey = "team" | "games" | LeaderStatField;
@@ -72,10 +82,17 @@ type ScheduledLeagueGame = LeagueGame & { date: string; sequence: number };
 type StandingRow = ReturnType<typeof standings>[number];
 type TeamLeaderRow = { teamId: string; line: StatLine & { games: number } };
 type PlayerLeaderRow = ReturnType<typeof aggregatePlayerStats>[number];
+type SeasonStatLine = StatLine & { games: number };
 
 interface LeagueBatchSimulationRequest {
   label: string;
   games: ScheduledLeagueGame[];
+  fromDate?: string;
+  throughDate?: string;
+  advanceToDate?: string;
+  confirmLabel?: string;
+  stopBeforeGameId?: string;
+  stopBeforeLabel?: string;
 }
 
 interface StandingsAlignment {
@@ -122,10 +139,23 @@ interface CardOpenerContextValue {
   openPlayerCard: (team: DiceTeamCard | string, player: DicePlayerCard | string) => void;
 }
 
+interface LeagueCardStatsContextValue {
+  leagueId: string;
+  leagueName: string;
+  teamStats: Record<string, SeasonStatLine>;
+  playerStats: Map<string, SeasonStatLine>;
+  teamRecords: Map<string, string>;
+}
+
 const CardOpenerContext = createContext<CardOpenerContextValue | null>(null);
+const LeagueCardStatsContext = createContext<LeagueCardStatsContextValue | null>(null);
 
 function useCardOpener() {
   return useContext(CardOpenerContext);
+}
+
+function useLeagueCardStats() {
+  return useContext(LeagueCardStatsContext);
 }
 
 const statColumns = ["PTS", "REB", "AST", "STL", "BLK", "TOV", "PF"];
@@ -201,6 +231,11 @@ function teamSearchText(team: SourceTeamCatalogEntry): string {
 
 function recordLabel(team: SourceTeamCatalogEntry): string {
   return `${team.team.wins ?? "-"}-${team.team.losses ?? "-"}`;
+}
+
+function standingsRecordLabel(row?: { wins: number; losses: number; ties?: number }): string {
+  if (!row) return "0-0";
+  return `${row.wins}-${row.losses}${row.ties ? `-${row.ties}` : ""}`;
 }
 
 function filterCatalogTeams(
@@ -553,6 +588,42 @@ function scheduledDateForGame(game: LeagueGame, index: number): string {
   return game.date ?? addDaysIso("2025-10-21", Math.floor(index / 8));
 }
 
+function scheduleLeagueGames(league: Pick<LeagueState, "games"> | null | undefined): ScheduledLeagueGame[] {
+  return (league?.games ?? [])
+    .map((game, index) => ({
+      ...game,
+      date: scheduledDateForGame(game, index),
+      sequence: game.sequence ?? index + 1
+    }))
+    .sort((a, b) => (a.date ?? "").localeCompare(b.date ?? "") || (a.sequence ?? 0) - (b.sequence ?? 0));
+}
+
+function addMonthsIso(date: string, months: number): string {
+  if (!date) return "";
+  const source = new Date(`${date}T00:00:00.000Z`);
+  const dayOfMonth = source.getUTCDate();
+  const target = new Date(Date.UTC(source.getUTCFullYear(), source.getUTCMonth() + months, 1));
+  const lastDayOfTargetMonth = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0)).getUTCDate();
+  target.setUTCDate(Math.min(dayOfMonth, lastDayOfTargetMonth));
+  return target.toISOString().slice(0, 10);
+}
+
+function leagueCurrentDate(league: LeagueState, games: ScheduledLeagueGame[]): string {
+  return league.currentDate ?? games.find((game) => game.status === "unplayed")?.date ?? games[0]?.date ?? "";
+}
+
+function nextLeagueMorning(date: string): string {
+  return date ? addDaysIso(date, 1) : "";
+}
+
+function nextUnplayedLeagueGame(games: ScheduledLeagueGame[], currentDate = "", teamId?: string): ScheduledLeagueGame | null {
+  const isMatch = (game: ScheduledLeagueGame) => {
+    if (game.status !== "unplayed") return false;
+    return !teamId || game.awayTeamId === teamId || game.homeTeamId === teamId;
+  };
+  return games.find((game) => isMatch(game) && (!currentDate || game.date >= currentDate)) ?? games.find(isMatch) ?? null;
+}
+
 function formatIsoDate(date: string): string {
   if (!date) return "-";
   return new Date(`${date}T00:00:00.000Z`).toLocaleDateString(undefined, {
@@ -571,8 +642,58 @@ function formatCalendarDay(date: string): string {
   });
 }
 
+function formatLeagueClock(date: string): string {
+  return date ? `${formatIsoDate(date)} · 9:00 AM` : "-";
+}
+
+function scheduleRangeLabel(games: ScheduledLeagueGame[]): string {
+  const firstDate = games[0]?.date ?? "";
+  const lastDate = games[games.length - 1]?.date ?? "";
+  if (!firstDate) return "No scheduled dates";
+  if (firstDate === lastDate) return formatIsoDate(firstDate);
+  return `${formatIsoDate(firstDate)} to ${formatIsoDate(lastDate)}`;
+}
+
+function leagueStatusFilterLabel(status: LeagueStatusFilter): string {
+  if (status === "all") return "All statuses";
+  if (status === "played") return "Played";
+  if (status === "simulated") return "Simulated";
+  if (status === "manual") return "Manual";
+  return "Unplayed";
+}
+
 function leagueGameLabel(game: LeagueGame, teamNames: Map<string, string>): string {
   return `${teamLabel(teamNames, game.awayTeamId)} at ${teamLabel(teamNames, game.homeTeamId)}`;
+}
+
+function shortSeasonLabel(season: string | undefined): string {
+  const match = season?.match(/^(\d{4})-(\d{2})$/);
+  return match ? `${match[1].slice(2)}-${match[2]}` : (season ?? "");
+}
+
+function calendarTeamCode(team: SourceTeamCatalogEntry | undefined, teamNames: Map<string, string>, teamId: string): string {
+  if (!team) return teamLabel(teamNames, teamId);
+  const season = shortSeasonLabel(team.season);
+  return season ? `${season} ${team.abbr}` : team.abbr;
+}
+
+function opponentTeamId(game: Pick<LeagueGame, "awayTeamId" | "homeTeamId">, teamId: string): string {
+  return game.awayTeamId === teamId ? game.homeTeamId : game.awayTeamId;
+}
+
+function teamGameScore(game: LeagueGame, teamId: string): number | undefined {
+  if (!game.result) return undefined;
+  if (game.awayTeamId === teamId) return game.result.awayScore;
+  if (game.homeTeamId === teamId) return game.result.homeScore;
+  return undefined;
+}
+
+function teamGameResultLabel(game: LeagueGame, teamId: string): string {
+  if (!game.result) return "Unplayed";
+  const teamScoreValue = teamGameScore(game, teamId);
+  const opponentScoreValue = teamGameScore(game, opponentTeamId(game, teamId));
+  const outcome = game.result.winnerTeamId === teamId ? "W" : game.result.winnerTeamId === "tie" ? "T" : "L";
+  return `${outcome} ${teamScoreValue ?? "-"}-${opponentScoreValue ?? "-"}`;
 }
 
 function teamLabel(teamNames: Map<string, string>, teamId: string): string {
@@ -589,6 +710,9 @@ function pct(num: number, den: number): string {
 }
 
 function stat(line: StatLine | undefined, field: string): number {
+  if (field === "REB") {
+    return Math.max(line?.REB ?? 0, (line?.OREB ?? 0) + (line?.DREB ?? 0));
+  }
   return line?.[field] ?? 0;
 }
 
@@ -598,6 +722,95 @@ function statPair(line: StatLine | undefined, madeField: string, attemptField: s
 
 function statPercent(line: StatLine | undefined, madeField: string, attemptField: string): string {
   return pct(stat(line, madeField), stat(line, attemptField));
+}
+
+function sourceValue(value: number | null | undefined): number {
+  return value ?? 0;
+}
+
+function teamSourceSeasonLine(team: DiceTeamCard): SeasonStatLine {
+  const totals = team.source.team.totals;
+  const games = sourceValue(team.source.team.wins) + sourceValue(team.source.team.losses);
+  return {
+    games,
+    FGM: sourceValue(totals.fg),
+    FGA: sourceValue(totals.fga),
+    "3PM": sourceValue(totals.fg3),
+    "3PA": sourceValue(totals.fg3a),
+    FTM: sourceValue(totals.ft),
+    FTA: sourceValue(totals.fta),
+    OREB: sourceValue(totals.orb),
+    DREB: sourceValue(totals.drb),
+    REB: sourceValue(totals.trb),
+    AST: sourceValue(totals.ast),
+    STL: sourceValue(totals.stl),
+    BLK: sourceValue(totals.blk),
+    TOV: sourceValue(totals.tov),
+    PF: sourceValue(totals.pf),
+    PTS: sourceValue(totals.pts)
+  };
+}
+
+function playerSourceSeasonLine(player: DicePlayerCard): SeasonStatLine {
+  const totals = player.source.totals;
+  return {
+    games: sourceValue(player.source.games),
+    FGM: sourceValue(totals.fg),
+    FGA: sourceValue(totals.fga),
+    "3PM": sourceValue(totals.fg3),
+    "3PA": sourceValue(totals.fg3a),
+    FTM: sourceValue(totals.ft),
+    FTA: sourceValue(totals.fta),
+    OREB: sourceValue(totals.orb),
+    DREB: sourceValue(totals.drb),
+    REB: sourceValue(totals.trb),
+    AST: sourceValue(totals.ast),
+    STL: sourceValue(totals.stl),
+    BLK: sourceValue(totals.blk),
+    TOV: sourceValue(totals.tov),
+    PF: sourceValue(totals.pf),
+    PTS: sourceValue(totals.pts)
+  };
+}
+
+function emptySeasonLine(): SeasonStatLine {
+  return { games: 0 };
+}
+
+function seasonLineValue(line: SeasonStatLine | undefined, field: string): number | undefined {
+  if (!line) return undefined;
+  if (field === "REB" && line.REB === undefined && (line.OREB !== undefined || line.DREB !== undefined)) {
+    return (line.OREB ?? 0) + (line.DREB ?? 0);
+  }
+  return line[field];
+}
+
+function seasonLineTotal(line: SeasonStatLine | undefined, field: string): string {
+  const value = seasonLineValue(line, field);
+  if (value === undefined || Number.isNaN(value)) return "-";
+  return Math.round(value).toLocaleString();
+}
+
+function seasonLinePct(line: SeasonStatLine | undefined, madeField: string, attemptField: string): string {
+  return pct(stat(line, madeField), stat(line, attemptField));
+}
+
+function seasonLinePerGame(line: SeasonStatLine | undefined, field: string, digits = 1): string {
+  if (!line?.games) return "-";
+  return formatNumber((seasonLineValue(line, field) ?? 0) / line.games, digits);
+}
+
+function seasonCountMetric(line: SeasonStatLine | undefined, label: string, field: string, displayMode: CardStatDisplayMode): { label: string; value: string; sub?: string } {
+  const total = seasonLineTotal(line, field);
+  const average = seasonLinePerGame(line, field);
+  if (displayMode === "totals") {
+    return { label, value: total, sub: average !== "-" ? `${average} /G` : undefined };
+  }
+  return { label, value: average, sub: total !== "-" ? `${total} total` : undefined };
+}
+
+function playerStatsKey(teamId: string, player: string): string {
+  return `${teamId}:${player}`;
 }
 
 function modifier(value: number | undefined, digits = 2): string {
@@ -861,21 +1074,22 @@ function StudioApp({ catalog }: { catalog: SourceCatalog }) {
     setAppStateLoading(true);
     setAppStateError(null);
     setSeasonLeagueStorageReady(false);
-    Promise.all([loadTournament(), loadSeasonLeagues(), loadSeasonLeague()])
-      .then(([savedTournament, savedSeasonLeagues, legacySeasonLeague]) => {
+    Promise.all([loadTournament(), loadSeasonLeagueCollection(), loadSeasonLeague()])
+      .then(([savedTournament, savedSeasonLeagueCollection, legacySeasonLeague]) => {
         if (!active) return;
         setTournamentState(savedTournament);
+        const { collection: savedSeasonLeagues, hasStoredCollection } = savedSeasonLeagueCollection;
         const leagues = [...savedSeasonLeagues.leagues];
-        if (legacySeasonLeague && !leagues.some((league) => league.id === legacySeasonLeague.id)) {
+        if (!hasStoredCollection && legacySeasonLeague && !leagues.some((league) => league.id === legacySeasonLeague.id)) {
           leagues.unshift(legacySeasonLeague);
         }
         const activeLeagueId =
           (savedSeasonLeagues.activeLeagueId && leagues.some((league) => league.id === savedSeasonLeagues.activeLeagueId) && savedSeasonLeagues.activeLeagueId) ||
-          legacySeasonLeague?.id ||
+          (!hasStoredCollection && legacySeasonLeague?.id) ||
           leagues[0]?.id ||
           null;
         setSeasonLeagueCollectionState({ leagues, activeLeagueId });
-        setSeasonLeagueDirtyRevision(0);
+        setSeasonLeagueDirtyRevision(!hasStoredCollection && legacySeasonLeague ? 1 : 0);
         setSeasonLeagueStorageReady(true);
       })
       .catch((reason: unknown) => {
@@ -918,7 +1132,7 @@ function StudioApp({ catalog }: { catalog: SourceCatalog }) {
       const exists = current.leagues.some((league) => league.id === next.id);
       return {
         leagues: exists ? current.leagues.map((league) => (league.id === next.id ? next : league)) : [next, ...current.leagues],
-        activeLeagueId: next.id
+        activeLeagueId: exists ? current.activeLeagueId ?? next.id : next.id
       };
     });
     setSeasonLeagueDirtyRevision((current) => current + 1);
@@ -964,6 +1178,21 @@ function StudioApp({ catalog }: { catalog: SourceCatalog }) {
     () => seasonLeagues.find((league) => league.id === seasonLeagueCollection.activeLeagueId) ?? null,
     [seasonLeagueCollection.activeLeagueId, seasonLeagues]
   );
+  const leagueCardStats = useMemo<LeagueCardStatsContextValue | null>(() => {
+    if (tab !== "league" || !activeSeasonLeague) return null;
+    const teamStats = aggregateTeamStats(activeSeasonLeague);
+    const playerStats = new Map(
+      aggregatePlayerStats(activeSeasonLeague).map((row) => [playerStatsKey(row.teamId, row.player), { games: row.games, ...row.totals } as SeasonStatLine])
+    );
+    const teamRecords = new Map(standings(activeSeasonLeague).map((row) => [row.teamId, standingsRecordLabel(row)]));
+    return {
+      leagueId: activeSeasonLeague.id,
+      leagueName: activeSeasonLeague.name,
+      teamStats,
+      playerStats,
+      teamRecords
+    };
+  }, [activeSeasonLeague, tab]);
   const [activeTeamCard, setActiveTeamCard] = useState<DiceTeamCard | null>(null);
   const [activePlayerCard, setActivePlayerCard] = useState<{ team: DiceTeamCard; player: DicePlayerCard } | null>(null);
   const [cardLoadError, setCardLoadError] = useState<string | null>(null);
@@ -1009,47 +1238,48 @@ function StudioApp({ catalog }: { catalog: SourceCatalog }) {
   return (
     <>
       <CardOpenerContext.Provider value={cardOpener}>
-        <div className={`app screen-only ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
-          <aside className="sidebar">
-            <div className="sidebar-header">
-              <div className="brand">
-                <div className="brand-mark" aria-hidden="true">
-                  <svg viewBox="0 0 48 48" focusable="false">
-                    <rect className="logo-die" x="6" y="6" width="36" height="36" rx="9" />
-                    <path className="logo-seam" d="M24 8c5.7 4.3 8.5 9.6 8.5 16S29.7 35.7 24 40" />
-                    <path className="logo-seam" d="M8 24h32" />
-                    <path className="logo-seam" d="M14.5 12.5c6.4 3.9 12.6 3.9 19 0" />
-                    <path className="logo-seam" d="M14.5 35.5c6.4-3.9 12.6-3.9 19 0" />
-                    <circle className="logo-pip" cx="17" cy="18" r="2.6" />
-                    <circle className="logo-pip" cx="31" cy="30" r="2.6" />
-                  </svg>
+        <LeagueCardStatsContext.Provider value={leagueCardStats}>
+          <div className={`app screen-only ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
+            <aside className="sidebar">
+              <div className="sidebar-header">
+                <div className="brand">
+                  <div className="brand-mark" aria-hidden="true">
+                    <svg viewBox="0 0 48 48" focusable="false">
+                      <rect className="logo-die" x="6" y="6" width="36" height="36" rx="9" />
+                      <path className="logo-seam" d="M24 8c5.7 4.3 8.5 9.6 8.5 16S29.7 35.7 24 40" />
+                      <path className="logo-seam" d="M8 24h32" />
+                      <path className="logo-seam" d="M14.5 12.5c6.4 3.9 12.6 3.9 19 0" />
+                      <path className="logo-seam" d="M14.5 35.5c6.4-3.9 12.6-3.9 19 0" />
+                      <circle className="logo-pip" cx="17" cy="18" r="2.6" />
+                      <circle className="logo-pip" cx="31" cy="30" r="2.6" />
+                    </svg>
+                  </div>
+                  <div className="brand-copy">
+                    <h1>Basketball Dice Studio</h1>
+                  </div>
                 </div>
-                <div className="brand-copy">
-                  <h1>Basketball Dice Studio</h1>
-                </div>
-              </div>
-              <button
-                type="button"
-                className="sidebar-toggle"
-                aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-                aria-expanded={!sidebarCollapsed}
-                title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-                onClick={() => setSidebarCollapsed((current) => !current)}
-              >
-                {sidebarCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
-              </button>
-            </div>
-            <nav className="nav">
-              {tabs.map((item) => (
-                <button key={item.id} className={tab === item.id ? "active" : ""} title={item.label} aria-label={item.label} onClick={() => setTab(item.id)}>
-                  {item.icon}
-                  <span>{item.label}</span>
+                <button
+                  type="button"
+                  className="sidebar-toggle"
+                  aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+                  aria-expanded={!sidebarCollapsed}
+                  title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+                  onClick={() => setSidebarCollapsed((current) => !current)}
+                >
+                  {sidebarCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
                 </button>
-              ))}
-            </nav>
-          </aside>
+              </div>
+              <nav className="nav">
+                {tabs.map((item) => (
+                  <button key={item.id} className={tab === item.id ? "active" : ""} title={item.label} aria-label={item.label} onClick={() => setTab(item.id)}>
+                    {item.icon}
+                    <span>{item.label}</span>
+                  </button>
+                ))}
+              </nav>
+            </aside>
 
-          <main className="workspace">
+            <main className="workspace">
             {teamLoadError && (
               <article className="panel">
                 <h3>Team Load Failed</h3>
@@ -1135,10 +1365,11 @@ function StudioApp({ catalog }: { catalog: SourceCatalog }) {
                 loadTeam={loadTeam}
               />
             )}
-          </main>
-        </div>
-        {activeTeamCard && <TeamCardModal team={activeTeamCard} onClose={() => setActiveTeamCard(null)} />}
-        {activePlayerCard && <PlayerCardModal team={activePlayerCard.team} player={activePlayerCard.player} onClose={() => setActivePlayerCard(null)} />}
+            </main>
+          </div>
+          {activeTeamCard && <TeamCardModal team={activeTeamCard} onClose={() => setActiveTeamCard(null)} />}
+          {activePlayerCard && <PlayerCardModal team={activePlayerCard.team} player={activePlayerCard.player} onClose={() => setActivePlayerCard(null)} />}
+        </LeagueCardStatsContext.Provider>
       </CardOpenerContext.Provider>
     </>
   );
@@ -1153,11 +1384,76 @@ function LoadingPanel({ label }: { label: string }) {
   );
 }
 
+function CardSeasonStats({
+  title,
+  displayMode,
+  onDisplayModeChange,
+  metrics
+}: {
+  title: string;
+  displayMode: CardStatDisplayMode;
+  onDisplayModeChange: (value: CardStatDisplayMode) => void;
+  metrics: Array<{ label: string; value: string; sub?: string }>;
+}) {
+  return (
+    <section className="card-season-stats">
+      <div className="team-card-section-title">
+        <h4>{title}</h4>
+        <span>{displayMode === "averages" ? "Per game" : "Totals"}</span>
+      </div>
+      <SegmentedControl<CardStatDisplayMode>
+        label="Display"
+        value={displayMode}
+        options={[
+          { value: "averages", label: "Per Game" },
+          { value: "totals", label: "Totals" }
+        ]}
+        onChange={onDisplayModeChange}
+      />
+      <div className="card-season-stat-grid">
+        {metrics.map((metric) => (
+          <span key={metric.label}>
+            <small>{metric.label}</small>
+            <strong>{metric.value}</strong>
+            {metric.sub && <em>{metric.sub}</em>}
+          </span>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function CardStatsToggle({ value, onChange }: { value: CardStatsMode; onChange: (value: CardStatsMode) => void }) {
+  return (
+    <SegmentedControl<CardStatsMode>
+      label="Stats"
+      value={value}
+      options={[
+        { value: "league", label: "League Season" },
+        { value: "source", label: "Source Season" }
+      ]}
+      onChange={onChange}
+    />
+  );
+}
+
 function PlayerCardModal({ team, player, onClose }: { team: DiceTeamCard; player: DicePlayerCard; onClose: () => void }) {
+  const leagueCardStats = useLeagueCardStats();
+  const hasLeagueStats = Boolean(leagueCardStats?.teamStats[team.id]);
+  const [statsMode, setStatsMode] = useState<CardStatsMode>(hasLeagueStats ? "league" : "source");
+  const [statDisplayMode, setStatDisplayMode] = useState<CardStatDisplayMode>("averages");
   const totalUseWeight = team.players.reduce((sum, row) => sum + row.useWeight, 0);
   const starterIds = new Set(rotationPlayerGroups(team.players).starters.map((row) => row.id));
   const usePct = totalUseWeight ? (player.useWeight / totalUseWeight) * 100 : 0;
   const starter = starterIds.has(player.id);
+  const leaguePlayerLine = leagueCardStats?.playerStats.get(playerStatsKey(team.id, player.name)) ?? emptySeasonLine();
+  const sourcePlayerLine = playerSourceSeasonLine(player);
+  const activeLine = statsMode === "league" && hasLeagueStats ? leaguePlayerLine : sourcePlayerLine;
+  const activeTitle = statsMode === "league" && hasLeagueStats ? `${leagueCardStats?.leagueName ?? "League"} Player Stats` : `${team.season} Source Stats`;
+
+  useEffect(() => {
+    setStatsMode(hasLeagueStats ? "league" : "source");
+  }, [hasLeagueStats, leagueCardStats?.leagueId, player.id, team.id]);
 
   return (
     <div
@@ -1187,21 +1483,27 @@ function PlayerCardModal({ team, player, onClose }: { team: DiceTeamCard; player
             </div>
           </div>
         </div>
-        <div className="player-card-stat-grid">
-          {[
-            ["PTS", player.source.perGame.pts],
-            ["REB", player.source.perGame.trb],
-            ["AST", player.source.perGame.ast],
-            ["STL", player.source.perGame.stl],
-            ["BLK", player.source.perGame.blk],
-            ["TOV", player.source.perGame.tov]
-          ].map(([label, value]) => (
-            <span key={label}>
-              <b>{value ?? "-"}</b>
-              {label}
-            </span>
-          ))}
-        </div>
+        {hasLeagueStats && (
+          <div className="card-season-controls">
+            <CardStatsToggle value={statsMode} onChange={setStatsMode} />
+          </div>
+        )}
+        <CardSeasonStats
+          title={activeTitle}
+          displayMode={statDisplayMode}
+          onDisplayModeChange={setStatDisplayMode}
+          metrics={[
+            { label: "GP", value: String(activeLine.games) },
+            seasonCountMetric(activeLine, "PTS", "PTS", statDisplayMode),
+            { label: "FG%", value: seasonLinePct(activeLine, "FGM", "FGA") },
+            { label: "3P%", value: seasonLinePct(activeLine, "3PM", "3PA") },
+            seasonCountMetric(activeLine, "REB", "REB", statDisplayMode),
+            seasonCountMetric(activeLine, "AST", "AST", statDisplayMode),
+            seasonCountMetric(activeLine, "STL", "STL", statDisplayMode),
+            seasonCountMetric(activeLine, "BLK", "BLK", statDisplayMode),
+            seasonCountMetric(activeLine, "TOV", "TOV", statDisplayMode)
+          ]}
+        />
         <div className="player-card-rating-grid">
           {[
             ["TOV", modifier(player.tov, 1)],
@@ -1234,10 +1536,24 @@ function PlayerCardModal({ team, player, onClose }: { team: DiceTeamCard; player
 }
 
 function TeamCardModal({ team, onClose }: { team: DiceTeamCard; onClose: () => void }) {
+  const leagueCardStats = useLeagueCardStats();
+  const hasLeagueStats = Boolean(leagueCardStats?.teamStats[team.id]);
+  const [statsMode, setStatsMode] = useState<CardStatsMode>(hasLeagueStats ? "league" : "source");
+  const [statDisplayMode, setStatDisplayMode] = useState<CardStatDisplayMode>("averages");
   const [activePlayer, setActivePlayer] = useState<DicePlayerCard | null>(null);
   const totalUseWeight = team.players.reduce((sum, player) => sum + player.useWeight, 0);
   const rotation = [...team.players].sort((a, b) => b.minutes - a.minutes).slice(0, 8);
-  const record = `${team.source.team.wins ?? 0}-${team.source.team.losses ?? 0}`;
+  const sourceRecord = `${team.source.team.wins ?? 0}-${team.source.team.losses ?? 0}`;
+  const leagueRecord = leagueCardStats?.teamRecords.get(team.id) ?? "0-0";
+  const sourceTeamLine = teamSourceSeasonLine(team);
+  const leagueTeamLine = leagueCardStats?.teamStats[team.id] ?? emptySeasonLine();
+  const activeLine = statsMode === "league" && hasLeagueStats ? leagueTeamLine : sourceTeamLine;
+  const activeRecord = statsMode === "league" && hasLeagueStats ? leagueRecord : sourceRecord;
+  const activeTitle = statsMode === "league" && hasLeagueStats ? `${leagueCardStats?.leagueName ?? "League"} Team Stats` : `${team.season} Source Stats`;
+
+  useEffect(() => {
+    setStatsMode(hasLeagueStats ? "league" : "source");
+  }, [hasLeagueStats, leagueCardStats?.leagueId, team.id]);
 
   return (
     <div
@@ -1249,8 +1565,8 @@ function TeamCardModal({ team, onClose }: { team: DiceTeamCard; onClose: () => v
     >
       <article className="panel team-card-modal" role="dialog" aria-modal="true" aria-labelledby="team-card-title" onMouseDown={(event) => event.stopPropagation()}>
         <div className="team-card-topline">
-          <span>{team.season}</span>
-          <span>{record}</span>
+          <span>{statsMode === "league" && hasLeagueStats ? "League Season" : team.season}</span>
+          <span>{activeRecord}</span>
         </div>
         <div className="team-card-hero">
           <TeamLogo team={team} className="team-card-logo-large" />
@@ -1263,6 +1579,32 @@ function TeamCardModal({ team, onClose }: { team: DiceTeamCard; onClose: () => v
               <span>{team.source.franchise}</span>
             </div>
           </div>
+        </div>
+        {hasLeagueStats && (
+          <div className="card-season-controls">
+            <CardStatsToggle value={statsMode} onChange={setStatsMode} />
+          </div>
+        )}
+        <CardSeasonStats
+          title={activeTitle}
+          displayMode={statDisplayMode}
+          onDisplayModeChange={setStatDisplayMode}
+          metrics={[
+            { label: "Record", value: activeRecord },
+            { label: "GP", value: String(activeLine.games) },
+            seasonCountMetric(activeLine, "PTS", "PTS", statDisplayMode),
+            { label: "FG%", value: seasonLinePct(activeLine, "FGM", "FGA") },
+            { label: "3P%", value: seasonLinePct(activeLine, "3PM", "3PA") },
+            seasonCountMetric(activeLine, "REB", "REB", statDisplayMode),
+            seasonCountMetric(activeLine, "AST", "AST", statDisplayMode),
+            seasonCountMetric(activeLine, "STL", "STL", statDisplayMode),
+            seasonCountMetric(activeLine, "BLK", "BLK", statDisplayMode),
+            seasonCountMetric(activeLine, "TOV", "TOV", statDisplayMode)
+          ]}
+        />
+        <div className="team-card-section-title">
+          <h4>Card Ratings</h4>
+          <span>Source model</span>
         </div>
         <MetricGrid
           metrics={[
@@ -1705,7 +2047,7 @@ function PlayableMatchup({
   onSaveResult
 }: {
   matchup: MatchupCard;
-  matchupOptions: MatchupOptions;
+  matchupOptions: SimulationOptions;
   title?: string;
   compact?: boolean;
   onSaveResult?: (result: GameResult) => void;
@@ -1716,8 +2058,10 @@ function PlayableMatchup({
   const [selectedPeriodIndex, setSelectedPeriodIndex] = useState<number | null>(null);
   const [followLatestPeriod, setFollowLatestPeriod] = useState(true);
   const [speed, setSpeed] = useState<PlaySpeed>("manual");
+  const [watchView, setWatchView] = useState<WatchGameView>("game");
   const [saved, setSaved] = useState(false);
   const cardOpener = useCardOpener();
+  const availabilityKey = (matchupOptions.unavailablePlayerIds ?? []).join("|");
 
   useEffect(() => {
     setGame(null);
@@ -1726,8 +2070,9 @@ function PlayableMatchup({
     setSelectedPeriodIndex(null);
     setFollowLatestPeriod(true);
     setSpeed("manual");
+    setWatchView("game");
     setSaved(false);
-  }, [matchup.away.id, matchup.home.id, matchupOptions.venue, matchupOptions.intensity]);
+  }, [matchup.away.id, matchup.home.id, matchupOptions.venue, matchupOptions.intensity, availabilityKey]);
 
   useEffect(() => {
     if (!game || speed === "manual" || visibleCount >= game.possessions.length) return;
@@ -1767,6 +2112,7 @@ function PlayableMatchup({
     setSelectedIndex(0);
     setSelectedPeriodIndex(nextGame.possessions[0]?.periodIndex ?? null);
     setFollowLatestPeriod(true);
+    setWatchView("game");
     setSaved(false);
   };
 
@@ -1803,6 +2149,9 @@ function PlayableMatchup({
   const currentScore = latestVisiblePossession?.endScore ?? { away: 0, home: 0 };
   const complete = Boolean(game && visibleCount >= game.possessions.length);
   const canAdvance = Boolean(game && visibleCount < game.possessions.length);
+  const liveResult = latestVisiblePossession?.liveResult ?? (complete ? game?.result ?? null : null);
+  const showWatchToggle = compact && Boolean(game);
+  const watchStatusLabel = latestVisiblePossession ? `${latestVisiblePossession.periodLabel} #${latestVisiblePossession.possessionNumber}` : "Pregame";
   const selectPeriod = (period: PeriodTraceSummary) => {
     const isLatestPeriod = latestVisiblePossession?.periodIndex === period.index;
     setSelectedPeriodIndex(period.index);
@@ -1871,6 +2220,19 @@ function PlayableMatchup({
             ]}
             onChange={setSpeed}
           />
+          {showWatchToggle && (
+            <div className="watch-view-switch">
+              <SegmentedControl
+                label="View"
+                value={watchView}
+                options={[
+                  { value: "game", label: "Game" },
+                  { value: "box", label: "Box Score" }
+                ]}
+                onChange={setWatchView}
+              />
+            </div>
+          )}
           <Button icon={<Pause size={16} />} disabled={speed === "manual"} onClick={() => setSpeed("manual")}>
             Pause
           </Button>
@@ -1900,6 +2262,16 @@ function PlayableMatchup({
             Start Game
           </Button>
         </article>
+      ) : compact && watchView === "box" ? (
+        <LiveBoxScorePanel
+          result={liveResult}
+          away={matchup.away}
+          home={matchup.home}
+          possessionLabel={watchStatusLabel}
+          visibleCount={visibleCount}
+          totalCount={game.possessions.length}
+          complete={complete}
+        />
       ) : (
         <div className="possession-layout">
           <article className="panel possession-feed-panel">
@@ -1996,6 +2368,57 @@ function PlayableMatchup({
 
       {complete && game && !compact && <ResultPanel result={game.result} away={matchup.away} home={matchup.home} />}
     </div>
+  );
+}
+
+function LiveBoxScorePanel({
+  result,
+  away,
+  home,
+  possessionLabel,
+  visibleCount,
+  totalCount,
+  complete
+}: {
+  result: GameResult | null;
+  away: DiceTeamCard;
+  home: DiceTeamCard;
+  possessionLabel: string;
+  visibleCount: number;
+  totalCount: number;
+  complete: boolean;
+}) {
+  const [activePlayerCard, setActivePlayerCard] = useState<{ team: DiceTeamCard; player: DicePlayerCard } | null>(null);
+  const teams = [away, home];
+
+  return (
+    <article className="panel live-box-score-panel">
+      <div className="panel-title live-box-score-title">
+        <div>
+          <h3>Live Box Score</h3>
+          <p>
+            {complete ? "Final" : possessionLabel} · {visibleCount}/{totalCount} possessions revealed
+          </p>
+        </div>
+        {result && <span className="badge">{result.awayScore}-{result.homeScore}</span>}
+      </div>
+
+      {result ? (
+        <>
+          {result.quarters.length ? <PeriodScoreboard result={result} away={away} home={home} /> : <p className="box-note">No period scoring yet.</p>}
+          <TeamComparison result={result} away={away} home={home} />
+          <div className="box-score-sections">
+            {teams.map((team) => (
+              <TeamBoxScore key={team.id} team={team} result={result} onPlayerSelect={(player) => setActivePlayerCard({ team, player })} />
+            ))}
+          </div>
+        </>
+      ) : (
+        <p className="empty-state">The live box score will appear after the first possession.</p>
+      )}
+
+      {activePlayerCard && <PlayerCardModal team={activePlayerCard.team} player={activePlayerCard.player} onClose={() => setActivePlayerCard(null)} />}
+    </article>
   );
 }
 
@@ -2459,11 +2882,32 @@ function Simulator({
   const [result, setResult] = useState<GameResult | null>(null);
   const [bulkGames, setBulkGames] = useState(500);
   const [bulk, setBulk] = useState<ReturnType<typeof summarizeSimulations> | null>(null);
+  const [takenAwayPlayerId, setTakenAwayPlayerId] = useState("");
+  const takenAwayPlayer = useMemo(() => {
+    for (const team of [away, home]) {
+      const player = team.players.find((candidate) => candidate.id === takenAwayPlayerId);
+      if (player) return { team, player };
+    }
+    return null;
+  }, [away, home, takenAwayPlayerId]);
+  const simulationOptions = useMemo<SimulationOptions>(
+    () => ({
+      ...matchupOptions,
+      unavailablePlayerIds: takenAwayPlayerId ? [takenAwayPlayerId] : []
+    }),
+    [matchupOptions, takenAwayPlayerId]
+  );
 
   useEffect(() => {
     setResult(null);
     setBulk(null);
-  }, [away.id, home.id, matchupOptions.venue, matchupOptions.intensity]);
+  }, [away.id, home.id, matchupOptions.venue, matchupOptions.intensity, takenAwayPlayerId]);
+
+  useEffect(() => {
+    if (!takenAwayPlayerId) return;
+    if ([away, home].some((team) => team.players.some((player) => player.id === takenAwayPlayerId))) return;
+    setTakenAwayPlayerId("");
+  }, [away, home, takenAwayPlayerId]);
 
   return (
     <section className="page">
@@ -2497,8 +2941,39 @@ function Simulator({
         sourceTeams={sourceTeams}
       />
 
+      <article className="panel simulation-availability-panel">
+        <div className="panel-title">
+          <div>
+            <h3>Availability</h3>
+          </div>
+          <span className="badge">{takenAwayPlayer ? "1 unavailable" : "Full rotation"}</span>
+        </div>
+        <div className="availability-controls">
+          <label className="inline-input availability-player-select">
+            Take Away
+            <select value={takenAwayPlayerId} onChange={(event) => setTakenAwayPlayerId(event.target.value)}>
+              <option value="">None</option>
+              {[away, home].map((team) => (
+                <optgroup key={team.id} label={`${team.shortName} ${team.season}`}>
+                  {team.players.map((player) => (
+                    <option key={player.id} value={player.id}>
+                      {player.name}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          </label>
+          {takenAwayPlayer && (
+            <span className="badge">
+              {takenAwayPlayer.team.shortName}: {takenAwayPlayer.player.name}
+            </span>
+          )}
+        </div>
+      </article>
+
       {mode === "play" ? (
-        <PlayableMatchup matchup={matchup} matchupOptions={matchupOptions} title="Play Game" />
+        <PlayableMatchup matchup={matchup} matchupOptions={simulationOptions} title="Play Game" />
       ) : (
         <>
           <article className="panel">
@@ -2519,7 +2994,7 @@ function Simulator({
             </div>
             {simulationRunMode === "single" ? (
               <div className="simulation-controls">
-                <Button icon={<Play size={16} />} variant="primary" onClick={() => setResult(simulateGame(away, home, Date.now(), "simulated", matchupOptions))}>
+                <Button icon={<Play size={16} />} variant="primary" onClick={() => setResult(simulateGame(away, home, Date.now(), "simulated", simulationOptions))}>
                   Sim One
                 </Button>
               </div>
@@ -2529,7 +3004,7 @@ function Simulator({
                   Games
                   <input type="number" min={1} max={10000} value={bulkGames} onChange={(event) => setBulkGames(Number(event.target.value))} />
                 </label>
-                <Button icon={<BarChart3 size={16} />} onClick={() => setBulk(summarizeSimulations(away, home, bulkGames, Date.now(), matchupOptions))}>
+                <Button icon={<BarChart3 size={16} />} onClick={() => setBulk(summarizeSimulations(away, home, bulkGames, Date.now(), simulationOptions))}>
                   Sim Many
                 </Button>
               </div>
@@ -2645,40 +3120,51 @@ function boxScoreGroups(team: DiceTeamCard, result: GameResult): { starters: str
 }
 
 function ResultPanel({ result, away, home }: { result: GameResult; away: DiceTeamCard; home: DiceTeamCard }) {
+  return (
+    <article className="panel result-panel">
+      <GameResultContent result={result} away={away} home={home} />
+    </article>
+  );
+}
+
+function GameResultContent({ result, away, home, showHeader = true }: { result: GameResult; away: DiceTeamCard; home: DiceTeamCard; showHeader?: boolean }) {
   const teams = [away, home];
   const playedAt = new Date(result.playedAt);
   const [activePlayerCard, setActivePlayerCard] = useState<{ team: DiceTeamCard; player: DicePlayerCard } | null>(null);
   const [activeTeamCard, setActiveTeamCard] = useState<DiceTeamCard | null>(null);
   return (
-    <article className="panel result-panel">
-      <div className="result-header">
-        <div className="final-score-grid">
-          {teams.map((team) => {
-            const score = teamScore(result, team);
-            const winner = result.winnerTeamId === team.id;
-            return (
-              <button key={team.id} type="button" className={`final-score-card ${winner ? "winner" : ""}`} onClick={() => setActiveTeamCard(team)}>
-                <span className="score-role">{team.id === away.id ? "Away" : "Home"}</span>
-                <TeamLogo team={team} className="team-logo-score" />
-                <div>
-                  <strong>{team.shortName}</strong>
-                  <span>{team.name}</span>
-                </div>
-                <b>{score}</b>
-              </button>
-            );
-          })}
+    <>
+      {showHeader && (
+        <div className="result-header">
+          <div className="final-score-grid">
+            {teams.map((team) => {
+              const score = teamScore(result, team);
+              const winner = result.winnerTeamId === team.id;
+              return (
+                <button key={team.id} type="button" className={`final-score-card ${winner ? "winner" : ""}`} onClick={() => setActiveTeamCard(team)}>
+                  <span className="score-role">{team.id === away.id ? "Away" : "Home"}</span>
+                  <TeamLogo team={team} className="team-logo-score" />
+                  <div>
+                    <strong>{team.shortName}</strong>
+                    <span>{team.name}</span>
+                  </div>
+                  <b>{score}</b>
+                </button>
+              );
+            })}
+          </div>
+          <div className="game-meta-list">
+            <span className={`status ${result.source}`}>{result.source}</span>
+            <span>{result.possessionsEach} poss/team</span>
+            <span>{Number.isNaN(playedAt.getTime()) ? "-" : playedAt.toLocaleString()}</span>
+          </div>
         </div>
-        <div className="game-meta-list">
-          <span className={`status ${result.source}`}>{result.source}</span>
-          <span>{result.possessionsEach} poss/team</span>
-          <span>{Number.isNaN(playedAt.getTime()) ? "-" : playedAt.toLocaleString()}</span>
-        </div>
-      </div>
+      )}
 
       {result.quarters.length ? <PeriodScoreboard result={result} away={away} home={home} /> : <p className="box-note">Manual entry has no period scoring.</p>}
 
       <TeamComparison result={result} away={away} home={home} />
+      <ResultAvailabilityEvents result={result} teams={teams} />
 
       <div className="box-score-sections">
         {teams.map((team) => (
@@ -2687,7 +3173,35 @@ function ResultPanel({ result, away, home }: { result: GameResult; away: DiceTea
       </div>
       {activePlayerCard && <PlayerCardModal team={activePlayerCard.team} player={activePlayerCard.player} onClose={() => setActivePlayerCard(null)} />}
       {activeTeamCard && <TeamCardModal team={activeTeamCard} onClose={() => setActiveTeamCard(null)} />}
-    </article>
+    </>
+  );
+}
+
+function ResultAvailabilityEvents({ result, teams }: { result: GameResult; teams: DiceTeamCard[] }) {
+  const events = result.playerAvailabilityEvents ?? [];
+  if (!events.length) return null;
+  const teamsById = new Map(teams.map((team) => [team.id, team]));
+  return (
+    <div className="availability-event-list">
+      {events.map((event, index) => {
+        const team = teamsById.get(event.teamId);
+        const detail =
+          event.reason === "fouled-out"
+            ? `Fouled out${event.fouls ? ` at ${event.fouls} PF` : ""}${event.periodLabel ? `, ${event.periodLabel}` : ""}`
+            : "Taken away";
+        return (
+          <div key={`${event.playerId}-${event.reason}-${index}`} className="availability-event">
+            {team && <TeamLogo team={team} className="team-logo-mini" />}
+            <span>
+              <strong>{event.player}</strong>
+              <small>
+                {team?.shortName ?? event.teamId} · {detail}
+              </small>
+            </span>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
@@ -3122,32 +3636,43 @@ function SeasonLeagueView({
   const [section, setSection] = useState<CompetitionSection>("schedule");
   const [scheduleTeamId, setScheduleTeamId] = useState(allTeamsValue);
   const [scheduleStatus, setScheduleStatus] = useState<LeagueStatusFilter>("all");
-  const [scheduleFrom, setScheduleFrom] = useState("");
-  const [scheduleThrough, setScheduleThrough] = useState("");
+  const [scheduleWeekStart, setScheduleWeekStart] = useState("");
+  const [focusTeamId, setFocusTeamId] = useState(allTeamsValue);
   const [batchRequest, setBatchRequest] = useState<LeagueBatchSimulationRequest | null>(null);
   const [mode, setMode] = useState<LeagueViewMode>("select");
+  const [renamingLeagueId, setRenamingLeagueId] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState("");
   const franchises = useMemo(() => franchiseChoicesFor(sourceTeams), [sourceTeams]);
   const sourceTeamsById = useMemo(() => new Map(sourceTeams.map((team) => [team.id, team])), [sourceTeams]);
   const selectedEntries = selected.map((teamId) => sourceTeamsById.get(teamId)).filter((team): team is SourceTeamCatalogEntry => Boolean(team));
   const leagueTeamEntries = (league?.teamIds ?? []).map((teamId) => sourceTeamsById.get(teamId)).filter((team): team is SourceTeamCatalogEntry => Boolean(team));
+  const leagueTeamKey = league?.teamIds.join("|") ?? "";
   const replacementTeams = useMemo(
     () => filterCatalogTeams(sourceTeams, { season: replaceSeason, query: replaceQuery, franchise: replaceFranchise }).slice(0, maxTeamPickerResults),
     [replaceFranchise, replaceQuery, replaceSeason, sourceTeams]
   );
-  const scheduledGames = useMemo<ScheduledLeagueGame[]>(
-    () =>
-      (league?.games ?? [])
-        .map((game, index) => ({
-          ...game,
-          date: scheduledDateForGame(game, index),
-          sequence: game.sequence ?? index + 1
-        }))
-        .sort((a, b) => (a.date ?? "").localeCompare(b.date ?? "") || (a.sequence ?? 0) - (b.sequence ?? 0)),
-    [league]
+  const scheduledGames = useMemo<ScheduledLeagueGame[]>(() => scheduleLeagueGames(league), [league]);
+  const leagueStandingsRows = useMemo(() => (league ? standings(league) : []), [league]);
+  const leagueRecordByTeamId = useMemo(
+    () => new Map(leagueStandingsRows.map((row) => [row.teamId, standingsRecordLabel(row)])),
+    [leagueStandingsRows]
   );
   const firstScheduleDate = scheduledGames[0]?.date ?? "";
   const lastScheduleDate = scheduledGames[scheduledGames.length - 1]?.date ?? "";
-  const [scheduleRangeStart, scheduleRangeEnd] = normalizedDateRange(scheduleFrom || firstScheduleDate, scheduleThrough || scheduleFrom || firstScheduleDate);
+  const firstScheduleWeekStart = firstScheduleDate ? startOfCalendarWeekIso(firstScheduleDate) : "";
+  const lastScheduleWeekStart = lastScheduleDate ? startOfCalendarWeekIso(lastScheduleDate) : "";
+  const currentLeagueDate = league ? leagueCurrentDate(league, scheduledGames) : "";
+  const currentWeekEnd = currentLeagueDate ? addDaysIso(currentLeagueDate, 6) : "";
+  const currentMonthEnd = currentLeagueDate ? addDaysIso(addMonthsIso(currentLeagueDate, 1), -1) : "";
+  const nextLeagueGame = nextUnplayedLeagueGame(scheduledGames, currentLeagueDate);
+  const nextFocusTeamGame = focusTeamId === allTeamsValue ? null : nextUnplayedLeagueGame(scheduledGames, currentLeagueDate, focusTeamId);
+  const currentDateGames = currentLeagueDate ? scheduledGames.filter((game) => game.date === currentLeagueDate) : [];
+  const currentDateFeatureGame = currentDateGames.find((game) => game.status === "unplayed") ?? currentDateGames[0] ?? null;
+  const scheduleRangeStart = scheduleWeekStart || (currentLeagueDate ? startOfCalendarWeekIso(currentLeagueDate) : firstScheduleWeekStart);
+  const scheduleRangeEnd = scheduleRangeStart ? addDaysIso(scheduleRangeStart, 6) : "";
+  const scheduleWeekLabel =
+    scheduleRangeStart && scheduleRangeEnd ? `${formatIsoDate(scheduleRangeStart)} through ${formatIsoDate(scheduleRangeEnd)}` : "No scheduled week";
+  const scheduleScopeLabel = `${scheduleWeekLabel} · ${scheduleTeamId === allTeamsValue ? "All teams" : teamLabel(teamNames, scheduleTeamId)} · ${leagueStatusFilterLabel(scheduleStatus)}`;
   const filteredScheduleGames = scheduledGames.filter((game) => {
     if (scheduleTeamId !== allTeamsValue && game.awayTeamId !== scheduleTeamId && game.homeTeamId !== scheduleTeamId) return false;
     if (scheduleStatus === "played" && !game.result) return false;
@@ -3173,9 +3698,9 @@ function SeasonLeagueView({
       if (game.status !== "unplayed") return false;
       return scheduleTeamId === allTeamsValue || game.awayTeamId === scheduleTeamId || game.homeTeamId === scheduleTeamId;
     })?.date ?? firstScheduleDate;
-  const nextUnplayedDate = scheduledGames.find((game) => game.status === "unplayed")?.date ?? firstScheduleDate;
-  const completedGames = league?.games.filter((game) => game.result).length ?? 0;
-  const unplayedGames = league?.games.filter((game) => game.status === "unplayed").length ?? 0;
+  const currentRecord = (teamId: string) => leagueRecordByTeamId.get(teamId) ?? "0-0";
+  const matchupRecordLabel = (game: Pick<LeagueGame, "awayTeamId" | "homeTeamId">): string =>
+    `${currentRecord(game.awayTeamId)} at ${currentRecord(game.homeTeamId)}`;
 
   useEffect(() => {
     setSelected((current) => {
@@ -3199,18 +3724,31 @@ function SeasonLeagueView({
   }, [league, mode]);
 
   useEffect(() => {
+    if (renamingLeagueId && !leagues.some((savedLeague) => savedLeague.id === renamingLeagueId)) {
+      setRenamingLeagueId(null);
+      setRenameDraft("");
+    }
+  }, [leagues, renamingLeagueId]);
+
+  useEffect(() => {
     if (!league) return;
-    const weekStart = startOfCalendarWeekIso(nextUnplayedDate || firstScheduleDate);
+    const persistedFocusTeamId = league.focusTeamId && league.teamIds.includes(league.focusTeamId) ? league.focusTeamId : null;
+    setFocusTeamId(persistedFocusTeamId ?? league.teamIds[0] ?? allTeamsValue);
+  }, [league?.focusTeamId, league?.id, leagueTeamKey]);
+
+  useEffect(() => {
+    if (!league) return;
+    const anchorDate = currentLeagueDate || firstScheduleDate;
+    const weekStart = anchorDate ? startOfCalendarWeekIso(anchorDate) : "";
     setScheduleTeamId(allTeamsValue);
     setScheduleStatus("all");
-    setScheduleFrom(weekStart);
-    setScheduleThrough(weekStart ? addDaysIso(weekStart, 6) : "");
+    setScheduleWeekStart(weekStart);
     setBatchRequest(null);
-  }, [firstScheduleDate, league?.id, nextUnplayedDate]);
+  }, [firstScheduleDate, league?.id]);
 
   useEffect(() => {
     setBatchRequest(null);
-  }, [scheduleFrom, scheduleStatus, scheduleTeamId, scheduleThrough]);
+  }, [scheduleStatus, scheduleTeamId, scheduleWeekStart]);
 
   const fillFromSeason = (nextSeason: string) => {
     const roster = seasonRoster(sourceTeams, nextSeason).slice(0, maxLeagueTeams);
@@ -3242,7 +3780,9 @@ function SeasonLeagueView({
     setLeagueError(null);
     try {
       const [away, home] = await Promise.all([loadTeam(game.awayTeamId), loadTeam(game.homeTeamId)]);
-      setLeague(simulateLeagueGameWithTeams(league, game.id, away, home));
+      const nextLeague = simulateLeagueGameWithTeams(league, game.id, away, home);
+      const gameDate = scheduledGames.find((scheduledGame) => scheduledGame.id === game.id)?.date;
+      setLeague(gameDate && (!league.currentDate || gameDate > league.currentDate) ? setLeagueCurrentDate(nextLeague, gameDate) : nextLeague);
     } catch (reason) {
       setLeagueError(reason instanceof Error ? reason.message : String(reason));
     } finally {
@@ -3250,23 +3790,96 @@ function SeasonLeagueView({
     }
   };
 
-  const simulateNextGame = async () => {
-    const nextGame = scheduledGames.find((game) => game.status === "unplayed");
-    if (nextGame) await simulateGameInLeague(nextGame);
-  };
-
-  const setScheduleWindow = (startDate: string, days: number) => {
-    setScheduleFrom(startDate);
-    setScheduleThrough(addDaysIso(startDate, Math.max(0, days - 1)));
+  const clampScheduleWeekStart = (weekStart: string) => {
+    if (!weekStart) return "";
+    if (firstScheduleWeekStart && weekStart < firstScheduleWeekStart) return firstScheduleWeekStart;
+    if (lastScheduleWeekStart && weekStart > lastScheduleWeekStart) return lastScheduleWeekStart;
+    return weekStart;
   };
 
   const setScheduleWeek = (date: string) => {
     const weekStart = startOfCalendarWeekIso(date);
-    setScheduleWindow(weekStart, 7);
+    setScheduleWeekStart(clampScheduleWeekStart(weekStart));
   };
 
   const shiftScheduleWeek = (days: number) => {
-    setScheduleWindow(addDaysIso(scheduleRangeStart || firstScheduleDate, days), 7);
+    setScheduleWeekStart(clampScheduleWeekStart(addDaysIso(scheduleRangeStart || firstScheduleWeekStart, days)));
+  };
+
+  const clampAdvanceThroughDate = (date: string) => {
+    if (!date) return "";
+    return lastScheduleDate && date > lastScheduleDate ? lastScheduleDate : date;
+  };
+
+  const unplayedGamesBetween = (startDate: string, endDate: string) => {
+    const [start, end] = normalizedDateRange(startDate, endDate);
+    return scheduledGames.filter((game) => game.status === "unplayed" && game.date >= start && game.date <= end);
+  };
+
+  const previewAdvanceThrough = (label: string, throughDate: string, confirmLabel: string) => {
+    setLeagueError(null);
+    const startDate = currentLeagueDate || firstScheduleDate;
+    const boundedThroughDate = clampAdvanceThroughDate(throughDate || startDate);
+    if (!startDate || !boundedThroughDate) {
+      setLeagueError("This league does not have a playable schedule yet.");
+      return;
+    }
+    if (boundedThroughDate < startDate) {
+      setLeagueError("The league clock is already past the selected schedule window.");
+      return;
+    }
+    const games = unplayedGamesBetween(startDate, boundedThroughDate);
+    setBatchRequest({
+      label,
+      games,
+      fromDate: startDate,
+      throughDate: boundedThroughDate,
+      advanceToDate: nextLeagueMorning(boundedThroughDate),
+      confirmLabel
+    });
+  };
+
+  const previewNextLeagueGame = () => {
+    setLeagueError(null);
+    if (!nextLeagueGame) {
+      setLeagueError("No unplayed games remain on the schedule.");
+      return;
+    }
+    setBatchRequest({
+      label: `Next league game: ${leagueGameLabel(nextLeagueGame, teamNames)}`,
+      games: [nextLeagueGame],
+      fromDate: nextLeagueGame.date,
+      throughDate: nextLeagueGame.date,
+      advanceToDate: nextLeagueGame.date,
+      confirmLabel: "Sim Next Game"
+    });
+  };
+
+  const previewNextFocusTeamGame = () => {
+    setLeagueError(null);
+    if (focusTeamId === allTeamsValue || !nextFocusTeamGame) {
+      setLeagueError("Choose a focus team with an unplayed game.");
+      return;
+    }
+    const startDate = currentLeagueDate && currentLeagueDate <= nextFocusTeamGame.date ? currentLeagueDate : nextFocusTeamGame.date;
+    const games = scheduledGames.filter((game) => game.status === "unplayed" && game.date >= startDate && game.date < nextFocusTeamGame.date);
+    const stopBeforeLabel = leagueGameLabel(nextFocusTeamGame, teamNames);
+    setBatchRequest({
+      label: `Stop at ${teamLabel(teamNames, focusTeamId)} next game: ${stopBeforeLabel}`,
+      games,
+      fromDate: startDate,
+      throughDate: nextFocusTeamGame.date,
+      advanceToDate: nextFocusTeamGame.date,
+      confirmLabel: "Advance to Team Game",
+      stopBeforeGameId: nextFocusTeamGame.id,
+      stopBeforeLabel
+    });
+  };
+
+  const changeFocusTeam = (teamId: string) => {
+    setFocusTeamId(teamId);
+    if (!league) return;
+    setLeague(setLeagueFocusTeam(league, teamId === allTeamsValue ? null : teamId));
   };
 
   const previewBatchSimulation = () => {
@@ -3278,8 +3891,11 @@ function SeasonLeagueView({
     const firstDate = filteredUnplayedGames[0].date ?? "";
     const lastDate = filteredUnplayedGames[filteredUnplayedGames.length - 1].date ?? "";
     setBatchRequest({
-      label: `${filteredUnplayedGames.length.toLocaleString()} games from ${formatIsoDate(firstDate)} through ${formatIsoDate(lastDate)}`,
-      games: filteredUnplayedGames
+      label: `${filteredUnplayedGames.length.toLocaleString()} unplayed games in the current week`,
+      games: filteredUnplayedGames,
+      fromDate: firstDate,
+      throughDate: lastDate,
+      confirmLabel: "Sim Week Games"
     });
   };
 
@@ -3293,13 +3909,19 @@ function SeasonLeagueView({
       let nextLeague = league;
       let seed = Date.now();
       for (const requestedGame of batchRequest.games) {
+        if (batchRequest.stopBeforeGameId && requestedGame.id === batchRequest.stopBeforeGameId) continue;
         const game = nextLeague.games.find((row) => row.id === requestedGame.id);
+        if (batchRequest.stopBeforeGameId && game?.id === batchRequest.stopBeforeGameId) continue;
         if (!game || game.status !== "unplayed") continue;
         const away = cards.get(game.awayTeamId);
         const home = cards.get(game.homeTeamId);
         if (!away || !home) throw new Error(`Missing team card for ${game.awayTeamId} or ${game.homeTeamId}.`);
         nextLeague = simulateLeagueGameWithTeams(nextLeague, game.id, away, home, seed);
         seed += 1;
+      }
+      if (batchRequest.advanceToDate) {
+        nextLeague = setLeagueCurrentDate(nextLeague, batchRequest.advanceToDate);
+        setScheduleWeek(batchRequest.advanceToDate);
       }
       setLeague(nextLeague);
       setBatchRequest(null);
@@ -3310,6 +3932,27 @@ function SeasonLeagueView({
     }
   };
 
+  const beginLeagueRename = (targetLeague: LeagueState) => {
+    setRenamingLeagueId(targetLeague.id);
+    setRenameDraft(targetLeague.name);
+    setLeagueError(null);
+  };
+
+  const cancelLeagueRename = () => {
+    setRenamingLeagueId(null);
+    setRenameDraft("");
+  };
+
+  const saveLeagueRename = (targetLeague: LeagueState) => {
+    const nextName = renameDraft.trim();
+    if (!nextName) return;
+    if (nextName !== targetLeague.name) {
+      setLeague(renameLeague(targetLeague, nextName));
+    }
+    cancelLeagueRename();
+    setLeagueError(null);
+  };
+
   const selectLeague = (leagueId: string) => {
     setActiveLeagueId(leagueId);
     setMode("play");
@@ -3318,6 +3961,7 @@ function SeasonLeagueView({
     setManualGame(null);
     setWatchGame(null);
     setInfoGame(null);
+    cancelLeagueRename();
   };
 
   const createCurrentLeague = () => {
@@ -3329,6 +3973,7 @@ function SeasonLeagueView({
     );
     setLeague(nextLeague);
     setMode("play");
+    cancelLeagueRename();
   };
 
   const deleteCurrentLeague = () => {
@@ -3340,6 +3985,7 @@ function SeasonLeagueView({
     setManualGame(null);
     setWatchGame(null);
     setInfoGame(null);
+    cancelLeagueRename();
   };
 
   const openLeagueMenu = () => {
@@ -3349,6 +3995,7 @@ function SeasonLeagueView({
     setManualGame(null);
     setWatchGame(null);
     setInfoGame(null);
+    cancelLeagueRename();
   };
 
   const openLeagueBuilder = () => {
@@ -3358,6 +4005,7 @@ function SeasonLeagueView({
     setManualGame(null);
     setWatchGame(null);
     setInfoGame(null);
+    cancelLeagueRename();
   };
 
   return (
@@ -3395,35 +4043,73 @@ function SeasonLeagueView({
           {leagues.length ? (
             <div className="league-menu-grid">
               {leagues.map((savedLeague) => {
-                const completed = savedLeague.games.filter((game) => game.result).length;
-                const unplayed = savedLeague.games.filter((game) => game.status === "unplayed").length;
+                const savedSchedule = scheduleLeagueGames(savedLeague);
+                const savedCurrentDate = leagueCurrentDate(savedLeague, savedSchedule);
+                const savedNextGame = nextUnplayedLeagueGame(savedSchedule, savedCurrentDate);
+                const isRenaming = renamingLeagueId === savedLeague.id;
                 return (
-                  <button
+                  <article
                     key={savedLeague.id}
-                    type="button"
                     className={`league-menu-card ${savedLeague.id === activeLeagueId ? "active" : ""}`}
-                    onClick={() => selectLeague(savedLeague.id)}
                   >
-                    <span className="league-card-main">
-                      <strong>{savedLeague.name}</strong>
-                      <small>{savedLeague.teamIds.length} teams</small>
-                    </span>
-                    <span className="league-card-stats">
-                      <span>
-                        <b>{completed.toLocaleString()}</b>
-                        <small>Complete</small>
-                      </span>
-                      <span>
-                        <b>{unplayed.toLocaleString()}</b>
-                        <small>Unplayed</small>
-                      </span>
-                      <span>
-                        <b>{savedLeague.games.length.toLocaleString()}</b>
-                        <small>Total</small>
-                      </span>
-                    </span>
-                    {savedLeague.id === activeLeagueId && <span className="badge">Last played</span>}
-                  </button>
+                    {isRenaming ? (
+                      <form
+                        className="league-rename-form"
+                        onSubmit={(event) => {
+                          event.preventDefault();
+                          saveLeagueRename(savedLeague);
+                        }}
+                      >
+                        <input
+                          aria-label="League name"
+                          value={renameDraft}
+                          autoFocus
+                          onChange={(event) => setRenameDraft(event.target.value)}
+                          onKeyDown={(event) => {
+                            if (event.key === "Escape") {
+                              event.preventDefault();
+                              cancelLeagueRename();
+                            }
+                          }}
+                        />
+                        <div className="league-rename-actions">
+                          <Button type="submit" icon={<Check size={14} />} variant="primary" disabled={!renameDraft.trim()}>
+                            Save
+                          </Button>
+                          <Button type="button" icon={<X size={14} />} onClick={cancelLeagueRename}>
+                            Cancel
+                          </Button>
+                        </div>
+                      </form>
+                    ) : (
+                      <>
+                        <button type="button" className="league-menu-card-select" onClick={() => selectLeague(savedLeague.id)}>
+                          <span className="league-card-main">
+                            <strong>{savedLeague.name}</strong>
+                            <small>
+                              {savedLeague.teamIds.length} teams · {scheduleRangeLabel(savedSchedule)}
+                            </small>
+                          </span>
+                          <span className="league-card-details">
+                            <span>
+                              <small>Current date</small>
+                              <strong>{formatLeagueClock(savedCurrentDate)}</strong>
+                            </span>
+                            <span>
+                              <small>Next game</small>
+                              <strong>{savedNextGame ? leagueGameLabel(savedNextGame, teamNames) : "Season complete"}</strong>
+                            </span>
+                          </span>
+                        </button>
+                        <div className="league-card-footer">
+                          {savedLeague.id === activeLeagueId ? <span className="badge">Last played</span> : <span aria-hidden="true" />}
+                          <Button icon={<Pencil size={14} />} onClick={() => beginLeagueRename(savedLeague)}>
+                            Rename
+                          </Button>
+                        </div>
+                      </>
+                    )}
+                  </article>
                 );
               })}
             </div>
@@ -3560,28 +4246,135 @@ function SeasonLeagueView({
 
       {mode === "play" && league && (
         <>
-          <article className="panel compact-panel">
-            <div className="panel-title">
+          <article className="panel league-command-center">
+            <div className="league-clock">
+              <span>League Date</span>
+              <strong>{formatLeagueClock(currentLeagueDate)}</strong>
+              <small>
+                {currentDateFeatureGame
+                  ? `Today: ${leagueGameLabel(currentDateFeatureGame, teamNames)}`
+                  : nextLeagueGame
+                    ? `Next tip: ${formatIsoDate(nextLeagueGame.date)} · ${leagueGameLabel(nextLeagueGame, teamNames)}`
+                    : "No remaining games on the schedule"}
+              </small>
+            </div>
+            <div className="league-command-main">
               <div>
-                <h3>{league.name}</h3>
+                {renamingLeagueId === league.id ? (
+                  <form
+                    className="league-title-edit"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      saveLeagueRename(league);
+                    }}
+                  >
+                    <input
+                      aria-label="League name"
+                      value={renameDraft}
+                      autoFocus
+                      onChange={(event) => setRenameDraft(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Escape") {
+                          event.preventDefault();
+                          cancelLeagueRename();
+                        }
+                      }}
+                    />
+                    <Button type="submit" icon={<Check size={14} />} variant="primary" disabled={!renameDraft.trim()}>
+                      Save
+                    </Button>
+                    <Button type="button" icon={<X size={14} />} onClick={cancelLeagueRename}>
+                      Cancel
+                    </Button>
+                  </form>
+                ) : (
+                  <div className="league-title-row">
+                    <h3>{league.name}</h3>
+                    <Button icon={<Pencil size={14} />} onClick={() => beginLeagueRename(league)}>
+                      Rename
+                    </Button>
+                  </div>
+                )}
                 <p>
-                  {completedGames.toLocaleString()} complete · {unplayedGames.toLocaleString()} unplayed · {league.games.length.toLocaleString()} total
+                  {league.teamIds.length.toLocaleString()} teams · {scheduleRangeLabel(scheduledGames)}
                 </p>
               </div>
-              <div className="actions">
-                <Button icon={<Play size={16} />} disabled={!unplayedGames || Boolean(pendingGameId)} onClick={() => void simulateNextGame()}>
-                  Sim Next
+              <div className="league-next-stack">
+                <div>
+                  <span>Next game</span>
+                  <strong>{nextLeagueGame ? leagueGameLabel(nextLeagueGame, teamNames) : "Season complete"}</strong>
+                  <small>{nextLeagueGame ? `${formatIsoDate(nextLeagueGame.date)} · ${matchupRecordLabel(nextLeagueGame)}` : "No unplayed games remain"}</small>
+                </div>
+                <div>
+                  <span>Focus team</span>
+                  <strong>{focusTeamId === allTeamsValue ? "Choose team" : teamLabel(teamNames, focusTeamId)}</strong>
+                  <small>{nextFocusTeamGame ? `${formatIsoDate(nextFocusTeamGame.date)} · ${leagueGameLabel(nextFocusTeamGame, teamNames)} · ${matchupRecordLabel(nextFocusTeamGame)}` : "No remaining game"}</small>
+                </div>
+              </div>
+            </div>
+            <div className="league-advance-bar">
+              <label className="league-focus-select">
+                Focus team
+                <select value={focusTeamId} onChange={(event) => changeFocusTeam(event.target.value)}>
+                  <option value={allTeamsValue}>Choose team</option>
+                  {leagueTeamEntries.map((team) => (
+                    <option key={team.id} value={team.id}>
+                      {team.shortName}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="league-advance-actions">
+                <Button
+                  icon={<Play size={16} />}
+                  disabled={!nextLeagueGame || Boolean(pendingGameId)}
+                  onClick={() => {
+                    setSection("schedule");
+                    previewNextLeagueGame();
+                  }}
+                >
+                  Sim Next Game
                 </Button>
                 <Button
                   icon={<SkipForward size={16} />}
-                  disabled={!filteredUnplayedGames.length || Boolean(pendingGameId)}
+                  disabled={!nextFocusTeamGame || Boolean(pendingGameId)}
                   variant="primary"
                   onClick={() => {
                     setSection("schedule");
-                    previewBatchSimulation();
+                    previewNextFocusTeamGame();
                   }}
                 >
-                  Preview Window
+                  Sim to Team Game
+                </Button>
+                <Button
+                  icon={<CalendarDays size={16} />}
+                  disabled={!currentLeagueDate || Boolean(pendingGameId)}
+                  onClick={() => {
+                    setSection("schedule");
+                    previewAdvanceThrough("Advance today", currentLeagueDate, "Sim Day");
+                  }}
+                >
+                  Sim Day
+                </Button>
+                <Button
+                  icon={<CalendarDays size={16} />}
+                  disabled={!currentWeekEnd || Boolean(pendingGameId)}
+                  onClick={() => {
+                    setSection("schedule");
+                    previewAdvanceThrough("Advance one week", currentWeekEnd, "Sim Week");
+                  }}
+                >
+                  Sim Week
+                </Button>
+                <Button
+                  icon={<CalendarDays size={16} />}
+                  disabled={!currentMonthEnd || Boolean(pendingGameId)}
+                  onClick={() => {
+                    setSection("schedule");
+                    previewAdvanceThrough("Advance one month", currentMonthEnd, "Sim Month");
+                  }}
+                >
+                  Sim Month
                 </Button>
               </div>
             </div>
@@ -3590,6 +4383,10 @@ function SeasonLeagueView({
             <button type="button" className={section === "schedule" ? "active" : ""} onClick={() => setSection("schedule")}>
               <CalendarDays size={16} />
               <span>Schedule</span>
+            </button>
+            <button type="button" className={section === "team" ? "active" : ""} onClick={() => setSection("team")}>
+              <BookOpen size={16} />
+              <span>Team</span>
             </button>
             <button type="button" className={section === "standings" ? "active" : ""} onClick={() => setSection("standings")}>
               <BarChart3 size={16} />
@@ -3611,12 +4408,10 @@ function SeasonLeagueView({
               <div className="panel-title">
                 <div>
                   <h3>Schedule</h3>
-                  <p>
-                    {filteredScheduleGames.length.toLocaleString()} matching games from {formatIsoDate(scheduleRangeStart)} through {formatIsoDate(scheduleRangeEnd)}.
-                  </p>
+                  <p>{scheduleScopeLabel}</p>
                 </div>
                 <Button icon={<SkipForward size={16} />} disabled={!filteredUnplayedGames.length || Boolean(pendingGameId)} variant="primary" onClick={previewBatchSimulation}>
-                  Preview Sim Window
+                  Preview Week
                 </Button>
               </div>
               <div className="schedule-controls">
@@ -3641,30 +4436,26 @@ function SeasonLeagueView({
                     <option value="manual">Manual</option>
                   </select>
                 </label>
-                <label>
-                  From
-                  <input type="date" min={firstScheduleDate} max={lastScheduleDate} value={scheduleFrom} onChange={(event) => setScheduleFrom(event.target.value)} />
-                </label>
-                <label>
-                  Through
-                  <input type="date" min={firstScheduleDate} max={lastScheduleDate} value={scheduleThrough} onChange={(event) => setScheduleThrough(event.target.value)} />
-                </label>
               </div>
-              <div className="schedule-window-actions">
-                <Button icon={<ChevronLeft size={16} />} onClick={() => shiftScheduleWeek(-7)}>
-                  Previous Week
-                </Button>
-                <Button onClick={() => setScheduleWeek(nextScopedUnplayedDate)}>Next Unplayed</Button>
-                <Button icon={<ChevronRight size={16} />} onClick={() => shiftScheduleWeek(7)}>
-                  Next Week
-                </Button>
-              </div>
-              <div className="result-count">
-                <ListFilter size={15} />
-                <span>
-                  {filteredUnplayedGames.length.toLocaleString()} unplayed games in this window
-                  {scheduleTeamId !== allTeamsValue ? ` for ${teamLabel(teamNames, scheduleTeamId)}` : ""}
-                </span>
+              <div className="schedule-week-toolbar">
+                <div className="schedule-week-label">
+                  <span>Viewing Week</span>
+                  <strong>{scheduleWeekLabel}</strong>
+                </div>
+                <div className="schedule-window-actions">
+                  <Button icon={<ChevronLeft size={16} />} disabled={!scheduleRangeStart || scheduleRangeStart <= firstScheduleWeekStart} onClick={() => shiftScheduleWeek(-7)}>
+                    Previous Week
+                  </Button>
+                  <Button icon={<CalendarDays size={16} />} disabled={!currentLeagueDate} onClick={() => setScheduleWeek(currentLeagueDate)}>
+                    Current Week
+                  </Button>
+                  <Button icon={<SkipForward size={16} />} disabled={!nextScopedUnplayedDate} onClick={() => setScheduleWeek(nextScopedUnplayedDate)}>
+                    Next Unplayed
+                  </Button>
+                  <Button icon={<ChevronRight size={16} />} disabled={!scheduleRangeStart || scheduleRangeStart >= lastScheduleWeekStart} onClick={() => shiftScheduleWeek(7)}>
+                    Next Week
+                  </Button>
+                </div>
               </div>
               <div className="calendar-week-header">
                 {weekdayLabels.map((day) => (
@@ -3676,48 +4467,114 @@ function SeasonLeagueView({
                   {calendarDays.map((day) => {
                     const visibleGames = day.games.slice(0, maxCalendarGamesPerDay);
                     const remaining = day.games.length - visibleGames.length;
+                    const currentDay = day.date === currentLeagueDate;
+                    const pastDay = Boolean(currentLeagueDate && day.date < currentLeagueDate);
                     return (
-                      <section key={day.date} className={`calendar-day ${day.inRange ? "" : "outside"} ${day.games.length ? "has-games" : ""}`}>
+                      <section
+                        key={day.date}
+                        className={`calendar-day ${day.inRange ? "" : "outside"} ${day.games.length ? "has-games" : ""} ${currentDay ? "current" : ""} ${pastDay ? "past" : ""}`}
+                      >
                         <div className="calendar-day-header">
                           <span>{formatCalendarDay(day.date)}</span>
-                          {day.games.length > 0 && <strong>{day.games.length}</strong>}
+                          <span className="calendar-day-badges">
+                            {currentDay && <strong>Today</strong>}
+                            {day.games.length > 0 && <strong>{day.games.length}</strong>}
+                          </span>
                         </div>
                         <div className="calendar-game-list">
                           {visibleGames.map((game) => {
                             const awayTeam = sourceTeamsById.get(game.awayTeamId);
                             const homeTeam = sourceTeamsById.get(game.homeTeamId);
+                            const played = Boolean(game.result);
+                            const gameLabel = leagueGameLabel(game, teamNames);
+                            const awayRecord = currentRecord(game.awayTeamId);
+                            const homeRecord = currentRecord(game.homeTeamId);
+                            const awayCode = calendarTeamCode(awayTeam, teamNames, game.awayTeamId);
+                            const homeCode = calendarTeamCode(homeTeam, teamNames, game.homeTeamId);
+                            const awayWon = game.result?.winnerTeamId === game.awayTeamId;
+                            const homeWon = game.result?.winnerTeamId === game.homeTeamId;
                             return (
-                              <div key={game.id} className="calendar-game-card">
+                              <div key={game.id} className={`calendar-game-card ${played ? "played" : "unplayed"} ${game.status}`}>
                                 <button
                                   type="button"
                                   className="calendar-game-main calendar-game-open"
-                                  aria-label={`Open ${leagueGameLabel(game, teamNames)} details`}
+                                  aria-label={`Open ${gameLabel} details`}
                                   onClick={() => setInfoGame(game)}
                                 >
-                                  <span className="calendar-game-logos">
+                                  <span className={`calendar-team-row ${awayWon ? "winner" : ""}`}>
                                     {awayTeam && <TeamLogo team={awayTeam} className="team-logo-mini" />}
+                                    <span className="calendar-team-copy">
+                                      <strong>{awayCode}</strong>
+                                      <small>{awayRecord}</small>
+                                    </span>
+                                    {game.result && <strong className="calendar-team-score">{game.result.awayScore}</strong>}
+                                  </span>
+                                  <span className={`calendar-team-row ${homeWon ? "winner" : ""}`}>
                                     {homeTeam && <TeamLogo team={homeTeam} className="team-logo-mini" />}
+                                    <span className="calendar-team-copy">
+                                      <strong>{homeCode}</strong>
+                                      <small>{homeRecord}</small>
+                                    </span>
+                                    {game.result && <strong className="calendar-team-score">{game.result.homeScore}</strong>}
                                   </span>
-                                  <span>
-                                    <strong>{teamLabel(teamNames, game.awayTeamId)}</strong>
-                                    <small>at {teamLabel(teamNames, game.homeTeamId)}</small>
-                                  </span>
-                                  <small>{game.result ? `${game.result.awayScore}-${game.result.homeScore}` : "Unplayed"}</small>
                                 </button>
-                                <span className={`status ${game.status}`}>{game.status}</span>
-                                <div className="calendar-game-actions">
-                                  <Button data-testid={`watch-${game.id}`} icon={<Play size={13} />} disabled={Boolean(pendingGameId)} onClick={() => setWatchGame(game)}>
-                                    Watch
-                                  </Button>
-                                  <Button data-testid={`sim-${game.id}`} icon={<Play size={13} />} disabled={Boolean(pendingGameId)} onClick={() => void simulateGameInLeague(game)}>
-                                    Sim
-                                  </Button>
-                                  <Button data-testid={`manual-${game.id}`} icon={<FileText size={13} />} disabled={Boolean(pendingGameId)} onMouseDown={() => setManualGame(game)} onClick={() => setManualGame(game)}>
-                                    Manual
-                                  </Button>
-                                  <Button data-testid={`unplayed-${game.id}`} icon={<RotateCcw size={13} />} disabled={Boolean(pendingGameId)} onClick={() => setLeague(markUnplayed(league, game.id))}>
-                                    Reset
-                                  </Button>
+                                <div className="calendar-game-footer">
+                                  {game.result && <span className="calendar-game-note">{game.status === "manual" ? "Manual final" : "Final"}</span>}
+                                  <div className="calendar-game-actions" aria-label={`Actions for ${gameLabel}`}>
+                                    <Button
+                                      className="calendar-icon-button"
+                                      data-testid={`watch-${game.id}`}
+                                      icon={<Play size={12} />}
+                                      aria-label={`Watch ${gameLabel}`}
+                                      data-tooltip="Watch"
+                                      title="Watch"
+                                      disabled={Boolean(pendingGameId)}
+                                      onClick={() => setWatchGame(game)}
+                                    >
+                                      Watch
+                                    </Button>
+                                    {!played && (
+                                      <Button
+                                        className="calendar-icon-button"
+                                        data-testid={`sim-${game.id}`}
+                                        icon={<SkipForward size={12} />}
+                                        aria-label={`Sim ${gameLabel}`}
+                                        data-tooltip="Sim"
+                                        title="Sim"
+                                        disabled={Boolean(pendingGameId)}
+                                        onClick={() => void simulateGameInLeague(game)}
+                                      >
+                                        Sim
+                                      </Button>
+                                    )}
+                                    <Button
+                                      className="calendar-icon-button"
+                                      data-testid={`manual-${game.id}`}
+                                      icon={<FileText size={12} />}
+                                      aria-label={`Enter manual result for ${gameLabel}`}
+                                      data-tooltip="Manual result"
+                                      title="Manual result"
+                                      disabled={Boolean(pendingGameId)}
+                                      onMouseDown={() => setManualGame(game)}
+                                      onClick={() => setManualGame(game)}
+                                    >
+                                      Manual
+                                    </Button>
+                                    {played && (
+                                      <Button
+                                        className="calendar-icon-button"
+                                        data-testid={`unplayed-${game.id}`}
+                                        icon={<RotateCcw size={12} />}
+                                        aria-label={`Reset ${gameLabel} to unplayed`}
+                                        data-tooltip="Reset to unplayed"
+                                        title="Reset to unplayed"
+                                        disabled={Boolean(pendingGameId)}
+                                        onClick={() => setLeague(markUnplayed(league, game.id))}
+                                      >
+                                        Reset
+                                      </Button>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
                             );
@@ -3732,6 +4589,18 @@ function SeasonLeagueView({
                 <p className="empty-state">No games match this calendar window.</p>
               )}
             </article>
+          )}
+          {section === "team" && (
+            <LeagueTeamDashboard
+              league={league}
+              teamId={focusTeamId}
+              onTeamChange={changeFocusTeam}
+              teamNames={teamNames}
+              sourceTeamsById={sourceTeamsById}
+              scheduledGames={scheduledGames}
+              currentLeagueDate={currentLeagueDate}
+              onOpenGame={setInfoGame}
+            />
           )}
           {section === "standings" && <StandingsTable league={league} teamNames={teamNames} sourceTeamsById={sourceTeamsById} />}
           {section === "leaders" && <LeagueLeaders league={league} teamNames={teamNames} sourceTeamsById={sourceTeamsById} />}
@@ -3787,24 +4656,38 @@ function SeasonLeagueView({
                 <div className="panel-title">
                   <div>
                     <h3 id="batch-sim-title">Confirm Simulation Window</h3>
-                    <p>{batchRequest.label}</p>
+                    <p>
+                      {batchRequest.label}
+                      {batchRequest.fromDate && batchRequest.throughDate
+                        ? ` · ${formatIsoDate(batchRequest.fromDate)} through ${formatIsoDate(batchRequest.throughDate)}`
+                        : ""}
+                    </p>
                   </div>
-                  <span className="badge">{batchRequest.games.length.toLocaleString()} games</span>
+                  <span className="badge">{batchRequest.games.length ? `${batchRequest.games.length.toLocaleString()} games` : "No games"}</span>
                 </div>
-                <div className="batch-game-list">
-                  {batchRequest.games.map((game) => (
-                    <div key={game.id} className="batch-game-row">
-                      <span>{formatIsoDate(game.date ?? "")}</span>
-                      <strong>{leagueGameLabel(game, teamNames)}</strong>
-                    </div>
-                  ))}
-                </div>
+                {batchRequest.stopBeforeLabel && <p className="box-note">Stops before {batchRequest.stopBeforeLabel}. That game stays unplayed.</p>}
+                {batchRequest.games.length ? (
+                  <div className="batch-game-list">
+                    {batchRequest.games.map((game) => (
+                      <div key={game.id} className="batch-game-row">
+                        <span>{formatIsoDate(game.date ?? "")}</span>
+                        <strong>{leagueGameLabel(game, teamNames)}</strong>
+                        <small>{matchupRecordLabel(game)}</small>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="empty-state">
+                    <strong>No scheduled games</strong>
+                    <p>{batchRequest.advanceToDate ? `Advance the league clock to ${formatLeagueClock(batchRequest.advanceToDate)}.` : "There is nothing to simulate."}</p>
+                  </div>
+                )}
                 <div className="actions">
                   <Button disabled={Boolean(pendingGameId)} onClick={() => setBatchRequest(null)}>
                     Cancel
                   </Button>
                   <Button icon={<SkipForward size={16} />} disabled={Boolean(pendingGameId)} variant="primary" onClick={() => void simulateBatchGames()}>
-                    Simulate Listed Games
+                    {batchRequest.confirmLabel ?? "Simulate Listed Games"}
                   </Button>
                 </div>
               </article>
@@ -3818,6 +4701,228 @@ function SeasonLeagueView({
 
 function statInputKey(team: DiceTeamCard, player: string): string {
   return `${team.id}:${player}`;
+}
+
+function LeagueTeamDashboard({
+  league,
+  teamId,
+  onTeamChange,
+  teamNames,
+  sourceTeamsById,
+  scheduledGames,
+  currentLeagueDate,
+  onOpenGame
+}: {
+  league: LeagueState;
+  teamId: string;
+  onTeamChange: (teamId: string) => void;
+  teamNames: Map<string, string>;
+  sourceTeamsById: Map<string, SourceTeamCatalogEntry>;
+  scheduledGames: ScheduledLeagueGame[];
+  currentLeagueDate: string;
+  onOpenGame: (game: ScheduledLeagueGame) => void;
+}) {
+  const selectedTeamId = teamId !== allTeamsValue && league.teamIds.includes(teamId) ? teamId : "";
+  const team = selectedTeamId ? sourceTeamsById.get(selectedTeamId) : undefined;
+  const rows = useMemo(() => standings(league), [league]);
+  const row = selectedTeamId ? rows.find((standing) => standing.teamId === selectedTeamId) : undefined;
+  const leader = rows[0];
+  const teamStats = useMemo(() => aggregateTeamStats(league), [league]);
+  const playerStats = useMemo(() => aggregatePlayerStats(league), [league]);
+  const teamLine = selectedTeamId ? teamStats[selectedTeamId] ?? emptySeasonLine() : emptySeasonLine();
+  const teamGames = selectedTeamId ? scheduledGames.filter((game) => game.awayTeamId === selectedTeamId || game.homeTeamId === selectedTeamId) : [];
+  const completedTeamGames = teamGames.filter((game) => game.result);
+  const upcomingTeamGames = teamGames.filter((game) => game.status === "unplayed" && (!currentLeagueDate || game.date >= currentLeagueDate));
+  const upcomingFallbackGames = teamGames.filter((game) => game.status === "unplayed");
+  const visibleUpcomingGames = (upcomingTeamGames.length ? upcomingTeamGames : upcomingFallbackGames).slice(0, 6);
+  const recentResults = [...completedTeamGames].reverse().slice(0, 6);
+  const lastTenGames = completedTeamGames.slice(-10);
+  const playerRows = playerStats.filter((player) => player.teamId === selectedTeamId).slice(0, 12);
+  const alignment = standingsAlignmentForTeam(team);
+  const played = row?.played ?? 0;
+  const differentialPerGame = played ? (row?.differential ?? 0) / played : null;
+  const lastTenRecord = recordForGames(lastTenGames, selectedTeamId);
+  const homeRecord = recordForGames(completedTeamGames.filter((game) => game.homeTeamId === selectedTeamId), selectedTeamId);
+  const awayRecord = recordForGames(completedTeamGames.filter((game) => game.awayTeamId === selectedTeamId), selectedTeamId);
+
+  return (
+    <article className="panel league-team-dashboard">
+      <div className="panel-title">
+        <div>
+          <h3>Team</h3>
+          <p>{selectedTeamId ? `${teamLabel(teamNames, selectedTeamId)} league profile` : "Select a focus team to inspect."}</p>
+        </div>
+        <label className="league-team-select">
+          Team
+          <select value={selectedTeamId || allTeamsValue} onChange={(event) => onTeamChange(event.target.value)}>
+            <option value={allTeamsValue}>Choose team</option>
+            {league.teamIds.map((id) => {
+              const entry = sourceTeamsById.get(id);
+              return (
+                <option key={id} value={id}>
+                  {entry?.shortName ?? teamLabel(teamNames, id)}
+                </option>
+              );
+            })}
+          </select>
+        </label>
+      </div>
+
+      {!selectedTeamId ? (
+        <div className="empty-state">
+          <strong>No team selected</strong>
+          <p>Choose a team to see standings context, season stats, player production, and schedule detail.</p>
+        </div>
+      ) : (
+        <>
+          <div className="league-team-hero">
+            {team && <TeamLogo team={team} className="team-logo-large" />}
+            <div>
+              <h3>{teamLabel(teamNames, selectedTeamId)}</h3>
+              <p>{team ? `${team.season} · ${team.franchise}` : selectedTeamId}</p>
+              <div className="player-card-tags">
+                <span>{alignment.conference}</span>
+                <span>{alignment.division}</span>
+                <span>{standingsRecordLabel(row)}</span>
+              </div>
+            </div>
+          </div>
+
+          <MetricGrid
+            metrics={[
+              ["Record", standingsRecordLabel(row)],
+              ["GP", played],
+              ["Win %", row ? row.winPct.toFixed(3) : "-"],
+              ["GB", formatGamesBack(row ?? leader, leader)],
+              ["Last 10", lastTenRecord],
+              ["Home/Away", `${homeRecord} / ${awayRecord}`],
+              ["PPG", seasonLinePerGame(teamLine, "PTS")],
+              ["OPP PPG", played ? formatNumber((row?.pointsAgainst ?? 0) / played, 1) : "-"],
+              ["Diff/G", differentialPerGame === null ? "-" : `${differentialPerGame > 0 ? "+" : ""}${formatNumber(differentialPerGame, 1)}`],
+              ["FG%", seasonLinePct(teamLine, "FGM", "FGA")],
+              ["3P%", seasonLinePct(teamLine, "3PM", "3PA")],
+              ["RPG", seasonLinePerGame(teamLine, "REB")]
+            ]}
+          />
+
+          <div className="league-team-detail-grid">
+            <section className="league-team-section">
+              <div className="team-card-section-title">
+                <h4>Recent Results</h4>
+                <span>{recentResults.length.toLocaleString()} shown</span>
+              </div>
+              <LeagueTeamGameList games={recentResults} teamId={selectedTeamId} teamNames={teamNames} sourceTeamsById={sourceTeamsById} onOpenGame={onOpenGame} emptyLabel="No completed games yet." />
+            </section>
+
+            <section className="league-team-section">
+              <div className="team-card-section-title">
+                <h4>Upcoming</h4>
+                <span>{visibleUpcomingGames.length.toLocaleString()} shown</span>
+              </div>
+              <LeagueTeamGameList games={visibleUpcomingGames} teamId={selectedTeamId} teamNames={teamNames} sourceTeamsById={sourceTeamsById} onOpenGame={onOpenGame} emptyLabel="No remaining games." />
+            </section>
+
+            <section className="league-team-section league-team-section-wide">
+              <div className="team-card-section-title">
+                <h4>Player Production</h4>
+                <span>Per game</span>
+              </div>
+              {playerRows.length ? (
+                <div className="table-wrap">
+                  <table className="leaders-table league-team-player-table">
+                    <thead>
+                      <tr>
+                        <th>Player</th>
+                        <th className="numeric-cell">GP</th>
+                        <th className="numeric-cell">PTS</th>
+                        <th className="numeric-cell">REB</th>
+                        <th className="numeric-cell">AST</th>
+                        <th className="numeric-cell">STL</th>
+                        <th className="numeric-cell">BLK</th>
+                        <th className="numeric-cell">FG%</th>
+                        <th className="numeric-cell">3P%</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {playerRows.map((player) => (
+                        <tr key={`${player.teamId}:${player.player}`}>
+                          <td>
+                            <PlayerNameButton teamId={player.teamId} player={player.player} />
+                          </td>
+                          <td className="numeric-cell">{player.games}</td>
+                          {leaderStatFields.map((field) => (
+                            <td className="numeric-cell" key={field}>
+                              {round(player.perGame[field])}
+                            </td>
+                          ))}
+                          <td className="numeric-cell">{pct(player.totals.FGM ?? 0, player.totals.FGA ?? 0)}</td>
+                          <td className="numeric-cell">{pct(player.totals["3PM"] ?? 0, player.totals["3PA"] ?? 0)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="empty-state">No player stats have been recorded for this league team yet.</p>
+              )}
+            </section>
+          </div>
+        </>
+      )}
+    </article>
+  );
+}
+
+function recordForGames(games: LeagueGame[], teamId: string): string {
+  let wins = 0;
+  let losses = 0;
+  let ties = 0;
+  for (const game of games) {
+    if (!game.result) continue;
+    if (game.result.winnerTeamId === teamId) wins += 1;
+    else if (game.result.winnerTeamId === "tie") ties += 1;
+    else losses += 1;
+  }
+  return `${wins}-${losses}${ties ? `-${ties}` : ""}`;
+}
+
+function LeagueTeamGameList({
+  games,
+  teamId,
+  teamNames,
+  sourceTeamsById,
+  onOpenGame,
+  emptyLabel
+}: {
+  games: ScheduledLeagueGame[];
+  teamId: string;
+  teamNames: Map<string, string>;
+  sourceTeamsById: Map<string, SourceTeamCatalogEntry>;
+  onOpenGame: (game: ScheduledLeagueGame) => void;
+  emptyLabel: string;
+}) {
+  if (!games.length) return <p className="empty-state">{emptyLabel}</p>;
+  return (
+    <div className="league-team-game-list">
+      {games.map((game) => {
+        const opponentId = opponentTeamId(game, teamId);
+        const opponent = sourceTeamsById.get(opponentId);
+        const venue = game.homeTeamId === teamId ? "vs" : "at";
+        return (
+          <button key={game.id} type="button" className="league-team-game-row" onClick={() => onOpenGame(game)}>
+            <span>{formatIsoDate(game.date)}</span>
+            <span className="league-team-game-opponent">
+              {opponent && <TeamLogo team={opponent} className="team-logo-mini" />}
+              <strong>
+                {venue} {teamLabel(teamNames, opponentId)}
+              </strong>
+            </span>
+            <span className={game.result ? (game.result.winnerTeamId === teamId ? "result-win" : "result-loss") : "result-pending"}>{teamGameResultLabel(game, teamId)}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
 }
 
 function initialManualInputs(game: LeagueGame, away: DiceTeamCard, home: DiceTeamCard): Record<string, Record<string, number>> {
@@ -4017,13 +5122,14 @@ function LeagueGameInfoModal({
   const [activeTeamCard, setActiveTeamCard] = useState<DiceTeamCard | null>(null);
   const [teamCardLoadingId, setTeamCardLoadingId] = useState<string | null>(null);
   const [teamCardError, setTeamCardError] = useState<string | null>(null);
+  const [boxScoreTeams, setBoxScoreTeams] = useState<{ away: DiceTeamCard; home: DiceTeamCard } | null>(null);
+  const [boxScoreError, setBoxScoreError] = useState<string | null>(null);
   const awayTeam = sourceTeamsById.get(game.awayTeamId);
   const homeTeam = sourceTeamsById.get(game.homeTeamId);
   const leagueRows = new Map(standings(league).map((row) => [row.teamId, row]));
   const leagueRecord = (teamId: string): string => {
     const row = leagueRows.get(teamId);
-    if (!row) return "0-0";
-    return `${row.wins}-${row.losses}${row.ties ? `-${row.ties}` : ""}`;
+    return standingsRecordLabel(row);
   };
   const winnerLabel = game.result?.winnerTeamId && game.result.winnerTeamId !== "tie" ? teamLabel(teamNames, game.result.winnerTeamId) : game.result?.winnerTeamId === "tie" ? "Tie" : "-";
 
@@ -4039,6 +5145,27 @@ function LeagueGameInfoModal({
     }
   };
 
+  useEffect(() => {
+    if (!game.result) {
+      setBoxScoreTeams(null);
+      setBoxScoreError(null);
+      return;
+    }
+    let active = true;
+    setBoxScoreTeams(null);
+    setBoxScoreError(null);
+    Promise.all([loadTeam(game.awayTeamId), loadTeam(game.homeTeamId)])
+      .then(([away, home]) => {
+        if (active) setBoxScoreTeams({ away, home });
+      })
+      .catch((reason: unknown) => {
+        if (active) setBoxScoreError(reason instanceof Error ? reason.message : String(reason));
+      });
+    return () => {
+      active = false;
+    };
+  }, [game.awayTeamId, game.homeTeamId, game.id, game.result, loadTeam]);
+
   const renderTeam = (role: "Away" | "Home", teamId: string, team?: SourceTeamCatalogEntry) => (
     <button type="button" className="game-info-team" aria-label={`Open ${teamLabel(teamNames, teamId)} team card`} onClick={() => void openTeamCard(teamId)}>
       <div className="game-info-team-heading">
@@ -4052,7 +5179,7 @@ function LeagueGameInfoModal({
       <div className="game-info-team-meta">
         <span>{team ? `${team.season} · ${team.franchise}` : teamId}</span>
         <span>Source {team ? recordLabel(team) : "-"}</span>
-        <span>League {leagueRecord(teamId)}</span>
+        <span>Current {leagueRecord(teamId)}</span>
       </div>
       {teamCardLoadingId === teamId && <span className="game-info-team-loading">Loading card...</span>}
     </button>
@@ -4096,6 +5223,18 @@ function LeagueGameInfoModal({
           </div>
         </div>
 
+        {game.result && (
+          <section className="game-info-box-score result-panel">
+            <div className="team-card-section-title">
+              <h4>Full Box Score</h4>
+              <span>{game.result.source}</span>
+            </div>
+            {boxScoreError && <p className="form-error">{boxScoreError}</p>}
+            {!boxScoreError && !boxScoreTeams && <p className="empty-state">Loading full box score.</p>}
+            {boxScoreTeams && <GameResultContent result={game.result} away={boxScoreTeams.away} home={boxScoreTeams.home} showHeader={false} />}
+          </section>
+        )}
+
         <div className="actions">
           <Button icon={<Play size={16} />} disabled={pending} onClick={onWatch}>
             Watch
@@ -4131,6 +5270,8 @@ function LeagueWatchGameLoader({
 }) {
   const [teams, setTeams] = useState<{ away: DiceTeamCard; home: DiceTeamCard } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const leagueRows = useMemo(() => new Map(standings(league).map((row) => [row.teamId, row])), [league]);
+  const leagueRecord = (teamId: string) => standingsRecordLabel(leagueRows.get(teamId));
 
   useEffect(() => {
     let active = true;
@@ -4154,7 +5295,7 @@ function LeagueWatchGameLoader({
         <div className="panel-title">
           <div>
             <h3>Watch Scheduled Game</h3>
-            <p>{teams ? `${teams.away.shortName} at ${teams.home.shortName}` : "Loading matchup."}</p>
+            <p>{teams ? `${teams.away.shortName} (${leagueRecord(teams.away.id)}) at ${teams.home.shortName} (${leagueRecord(teams.home.id)})` : "Loading matchup."}</p>
           </div>
           <Button onClick={onClose}>Close</Button>
         </div>
@@ -4264,6 +5405,8 @@ function ManualResultForm({
   const [parseBusy, setParseBusy] = useState(false);
   const [parseText, setParseText] = useState("");
   const [activePlayerCard, setActivePlayerCard] = useState<{ team: DiceTeamCard; player: DicePlayerCard } | null>(null);
+  const leagueRows = useMemo(() => new Map(standings(league).map((row) => [row.teamId, row])), [league]);
+  const leagueRecord = (teamId: string) => standingsRecordLabel(leagueRows.get(teamId));
 
   const update = (team: DiceTeamCard, player: string, field: string, value: number) => {
     const key = statInputKey(team, player);
@@ -4338,7 +5481,9 @@ function ManualResultForm({
           <h3>
             Manual Result: {away.shortName} at {home.shortName}
           </h3>
-          <p>Import a scorecard, review parsed values, then save the final result.</p>
+          <p>
+            {away.shortName} {leagueRecord(away.id)} at {home.shortName} {leagueRecord(home.id)} · Import a scorecard, review parsed values, then save the final result.
+          </p>
         </div>
         <Button onClick={onClose}>Close</Button>
       </div>
@@ -4472,7 +5617,8 @@ function StandingsTable({
   const [view, setView] = useState<StandingsView>("conference");
   const rows = useMemo(() => standings(league), [league]);
   const seedsByTeamId = useMemo(() => conferenceSeedMap(rows, sourceTeamsById), [rows, sourceTeamsById]);
-  const completedGames = league.games.filter((game) => game.result).length;
+  const standingsSubtitle =
+    view === "overall" ? "Overall table sorted by record" : view === "conference" ? "Grouped by conference and sorted by record" : "Grouped by division and sorted by record";
   const groups = useMemo<StandingsGroup[]>(() => {
     if (view === "overall") return [{ label: "Overall", rows }];
     if (view === "conference") {
@@ -4494,9 +5640,7 @@ function StandingsTable({
       <div className="panel-title standings-title">
         <div>
           <h3>{league.name} Standings</h3>
-          <p>
-            {league.teamIds.length.toLocaleString()} teams · {completedGames.toLocaleString()} games complete
-          </p>
+          <p>{standingsSubtitle}</p>
         </div>
       </div>
       <div className="standings-toolbar">
@@ -4678,7 +5822,6 @@ function LeagueLeaders({
   const sortedTeamRows = useMemo(() => sortTeamLeaderRows(teamRows, teamSort, teamNames), [teamNames, teamRows, teamSort]);
   const sortedPlayerRows = useMemo(() => sortPlayerLeaderRows(playerStats, playerSort, teamNames), [playerSort, playerStats, teamNames]);
   const groups = useMemo(() => leagueLeaderGroups(view, sortedTeamRows, sortedPlayerRows, sourceTeamsById), [sortedPlayerRows, sourceTeamsById, sortedTeamRows, view]);
-  const played = league.games.filter((game) => game.result).length;
   const setTeamLeaderSort = (key: TeamLeaderSortKey, defaultDirection: SortDirection) => setTeamSort((current) => nextSortState(current, key, defaultDirection));
   const setPlayerLeaderSort = (key: PlayerLeaderSortKey, defaultDirection: SortDirection) => setPlayerSort((current) => nextSortState(current, key, defaultDirection));
 
@@ -4688,7 +5831,7 @@ function LeagueLeaders({
         <div className="panel-title">
           <div>
             <h3>League Leaders</h3>
-            <p>{played} games completed in the current local league.</p>
+            <p>Averages and totals are based on saved league box scores.</p>
           </div>
         </div>
         <div className="standings-toolbar">

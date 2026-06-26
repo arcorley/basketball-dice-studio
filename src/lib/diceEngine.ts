@@ -10,6 +10,7 @@ import type {
   PossessionTrace,
   RangeRow,
   RollTraceStep,
+  SimulationOptions,
   ShotLocationProfileMethod,
   ShotZone,
   SourcePlayer,
@@ -34,6 +35,7 @@ export const simParams = {
   blockBase: 7,
   stealTurnoverPct: 60,
   nonshootFoulChance: 7,
+  foulOutLimit: 6,
   defenseShotDivisor: 2,
   maxOrbExtensions: 2,
   crossEraStyleBlendYears: 30,
@@ -85,6 +87,10 @@ type MatchupActionProfile = {
   turnoverScale: number;
   foulDrawScale: number;
   threeAttemptScale: number;
+};
+type GameAvailabilityState = {
+  unavailablePlayerIds: Set<string>;
+  events: NonNullable<GameResult["playerAvailabilityEvents"]>;
 };
 
 const matchupProfileCache = new Map<string, MatchupPlayerProfile>();
@@ -1052,15 +1058,84 @@ export function buildMatchupCard(away: DiceTeamCard, home: DiceTeamCard, options
   };
 }
 
+function availabilityTargets(away: DiceTeamCard, home: DiceTeamCard): Array<{ team: DiceTeamCard; player: DicePlayerCard }> {
+  return [away, home].flatMap((team) => team.players.map((player) => ({ team, player })));
+}
+
+function findAvailabilityTarget(away: DiceTeamCard, home: DiceTeamCard, token: string): { team: DiceTeamCard; player: DicePlayerCard } | undefined {
+  const targets = availabilityTargets(away, home);
+  const exactId = targets.find(({ player }) => player.id === token);
+  if (exactId) return exactId;
+
+  const normalized = token.toLowerCase();
+  const matches = targets.filter(({ team, player }) => player.name.toLowerCase() === normalized || `${team.id}:${player.name}`.toLowerCase() === normalized);
+  return matches.length === 1 ? matches[0] : undefined;
+}
+
+function markPlayerUnavailable(
+  availability: GameAvailabilityState,
+  team: DiceTeamCard,
+  player: DicePlayerCard,
+  reason: NonNullable<GameResult["playerAvailabilityEvents"]>[number]["reason"],
+  trace?: PossessionTrace,
+  fouls?: number
+): boolean {
+  if (availability.unavailablePlayerIds.has(player.id)) return false;
+  availability.unavailablePlayerIds.add(player.id);
+  availability.events.push({
+    teamId: team.id,
+    playerId: player.id,
+    player: player.name,
+    reason,
+    fouls,
+    periodLabel: trace?.periodLabel,
+    possessionNumber: trace?.possessionNumber
+  });
+  if (trace) {
+    addTraceStep(trace, {
+      label: reason === "fouled-out" ? "Foul out" : "Player unavailable",
+      result: player.name,
+      detail: reason === "fouled-out" ? `${fouls ?? simParams.foulOutLimit} personal fouls` : team.shortName
+    });
+  }
+  return true;
+}
+
+function createGameAvailabilityState(away: DiceTeamCard, home: DiceTeamCard, options: Partial<SimulationOptions>): GameAvailabilityState {
+  const availability: GameAvailabilityState = {
+    unavailablePlayerIds: new Set(),
+    events: []
+  };
+
+  for (const token of options.unavailablePlayerIds ?? []) {
+    const target = findAvailabilityTarget(away, home, token);
+    if (!target) {
+      throw new Error(`Unknown unavailable player for ${away.id} at ${home.id}: ${token}`);
+    }
+    markPlayerUnavailable(availability, target.team, target.player, "taken-away");
+  }
+
+  return availability;
+}
+
+function playerAvailable(player: DicePlayerCard, availability?: GameAvailabilityState): boolean {
+  return !availability?.unavailablePlayerIds.has(player.id);
+}
+
+function availablePlayerPool(team: DiceTeamCard, availability?: GameAvailabilityState, excludeName = ""): DicePlayerCard[] {
+  const candidates = team.players.filter((player) => player.name !== excludeName);
+  return candidates.filter((player) => playerAvailable(player, availability));
+}
+
 function weightedChoiceResult(
   team: DiceTeamCard,
   event: AssignmentEvent,
   options: MatchupOptions,
   rng: SeededRandom,
-  excludeName = ""
+  excludeName = "",
+  availability?: GameAvailabilityState
 ): { player: DicePlayerCard | undefined; roll: number; total: number } {
-  const items = team.players
-    .filter((player) => player.name !== excludeName)
+  const items = availablePlayerPool(team, availability, excludeName)
     .map((player) => ({ player, weight: assignmentWeight(team, player, event, options) }))
     .filter((item) => item.weight > 0);
   const total = items.reduce((sum, item) => sum + item.weight, 0);
@@ -1075,15 +1150,24 @@ function weightedChoiceResult(
   return { player: items.at(-1)?.player, roll: originalRoll, total };
 }
 
-function selectOffensivePlayerResult(team: DiceTeamCard, options: MatchupOptions, rng: SeededRandom): { player: DicePlayerCard; roll: number; total: number } {
-  const total = team.players.reduce((sum, player) => sum + contextualUseWeight(team, player, options), 0);
+function selectOffensivePlayerResult(
+  team: DiceTeamCard,
+  options: MatchupOptions,
+  rng: SeededRandom,
+  availability?: GameAvailabilityState
+): { player: DicePlayerCard; roll: number; total: number } {
+  const players = availablePlayerPool(team, availability);
+  const total = players.reduce((sum, player) => sum + contextualUseWeight(team, player, options), 0);
+  if (total <= 0) {
+    throw new Error(`${team.id} has no positive active player use weights.`);
+  }
   let roll = rng.next() * total;
   const originalRoll = roll;
-  for (const player of team.players) {
+  for (const player of players) {
     roll -= contextualUseWeight(team, player, options);
     if (roll <= 0) return { player, roll: originalRoll, total };
   }
-  return { player: team.players.at(-1) as DicePlayerCard, roll: originalRoll, total };
+  return { player: players.at(-1) as DicePlayerCard, roll: originalRoll, total };
 }
 
 function emptyTeamStats(): StatLine {
@@ -1098,6 +1182,22 @@ function add(statLine: StatLine, field: string, amount = 1): void {
   statLine[field] = (statLine[field] ?? 0) + amount;
 }
 
+function addPersonalFoul(
+  team: DiceTeamCard,
+  player: DicePlayerCard,
+  playerStats: Record<string, StatLine>,
+  teamStats: StatLine,
+  availability: GameAvailabilityState,
+  trace?: PossessionTrace
+): void {
+  add(playerStats[player.name], "PF");
+  add(teamStats, "PF");
+  const fouls = playerStats[player.name].PF ?? 0;
+  if (fouls >= simParams.foulOutLimit) {
+    markPlayerUnavailable(availability, team, player, "fouled-out", trace, fouls);
+  }
+}
+
 function resolvePossession(
   offense: DiceTeamCard,
   defense: DiceTeamCard,
@@ -1108,6 +1208,7 @@ function resolvePossession(
   offenseTeamStats: StatLine,
   defenseTeamStats: StatLine,
   rng: SeededRandom,
+  availability: GameAvailabilityState,
   trace?: PossessionTrace
 ): void {
   add(offenseTeamStats, "poss");
@@ -1124,7 +1225,7 @@ function resolvePossession(
         detail: `${defense.shortName} non-shooting foul range`
       });
       if (looseFoul.success) {
-        const foulChoice = weightedChoiceResult(defense, "PF", options, rng);
+        const foulChoice = weightedChoiceResult(defense, "PF", options, rng, "", availability);
         const fouler = foulChoice.player;
         addTraceStep(trace, {
           label: "Personal foul assignment",
@@ -1134,14 +1235,13 @@ function resolvePossession(
           detail: "PF assignment table"
         });
         if (fouler) {
-          add(defensePlayerStats[fouler.name], "PF");
-          add(defenseTeamStats, "PF");
+          addPersonalFoul(defense, fouler, defensePlayerStats, defenseTeamStats, availability, trace);
           add(offenseTeamStats, "nonshooting_fouls_drawn");
         }
       }
     }
 
-    const shooterChoice = selectOffensivePlayerResult(offense, options, rng);
+    const shooterChoice = selectOffensivePlayerResult(offense, options, rng, availability);
     const shooter = shooterChoice.player;
     addTraceStep(trace, {
       label: "Usage assignment",
@@ -1175,8 +1275,7 @@ function resolvePossession(
         detail: shooter.name
       });
       if (offensiveFoul.success) {
-        add(offensePlayerStats[shooter.name], "PF");
-        add(offenseTeamStats, "PF");
+        addPersonalFoul(offense, shooter, offensePlayerStats, offenseTeamStats, availability, trace);
         if (trace) trace.summary = `${offense.shortName} turnover, offensive foul on ${shooter.name}`;
         return;
       }
@@ -1189,7 +1288,7 @@ function resolvePossession(
         detail: shooter.name
       });
       if (liveBall.success) {
-        const stealChoice = weightedChoiceResult(defense, "STL", options, rng);
+        const stealChoice = weightedChoiceResult(defense, "STL", options, rng, "", availability);
         const stealer = stealChoice.player;
         addTraceStep(trace, {
           label: "Steal assignment",
@@ -1208,7 +1307,7 @@ function resolvePossession(
     }
 
     if (actionRoll < effectiveTov + effectiveFd) {
-      const foulChoice = weightedChoiceResult(defense, "ShootingPF", options, rng);
+      const foulChoice = weightedChoiceResult(defense, "ShootingPF", options, rng, "", availability);
       const fouler = foulChoice.player;
       addTraceStep(trace, {
         label: "Shooting foul assignment",
@@ -1218,8 +1317,7 @@ function resolvePossession(
         detail: `${defense.shortName} shooting PF table`
       });
       if (fouler) {
-        add(defensePlayerStats[fouler.name], "PF");
-        add(defenseTeamStats, "PF");
+        addPersonalFoul(defense, fouler, defensePlayerStats, defenseTeamStats, availability, trace);
       }
       for (let shot = 0; shot < 2; shot += 1) {
         add(offensePlayerStats[shooter.name], "FTA");
@@ -1257,7 +1355,7 @@ function resolvePossession(
 
     let shotTaker = shooter;
     if (actionRoll < effectiveTov + effectiveFd) {
-      const continuationChoice = selectOffensivePlayerResult(offense, options, rng);
+      const continuationChoice = selectOffensivePlayerResult(offense, options, rng, availability);
       shotTaker = continuationChoice.player;
       addTraceStep(trace, {
         label: "Continuation usage",
@@ -1319,7 +1417,7 @@ function resolvePossession(
         detail: isThree ? "Made 3P assist range" : "Made 2P assist range"
       });
       if (assist.success) {
-        const assistChoice = weightedChoiceResult(offense, "AST", options, rng, shotTaker.name);
+        const assistChoice = weightedChoiceResult(offense, "AST", options, rng, shotTaker.name, availability);
         const passer = assistChoice.player;
         addTraceStep(trace, {
           label: "Assist assignment",
@@ -1342,7 +1440,7 @@ function resolvePossession(
         detail: shotTaker.name
       });
       if (andOne.success) {
-        const foulChoice = weightedChoiceResult(defense, "ShootingPF", options, rng);
+        const foulChoice = weightedChoiceResult(defense, "ShootingPF", options, rng, "", availability);
         const fouler = foulChoice.player;
         addTraceStep(trace, {
           label: "And-one foul assignment",
@@ -1352,8 +1450,7 @@ function resolvePossession(
           detail: `${defense.shortName} shooting PF table`
         });
         if (fouler) {
-          add(defensePlayerStats[fouler.name], "PF");
-          add(defenseTeamStats, "PF");
+          addPersonalFoul(defense, fouler, defensePlayerStats, defenseTeamStats, availability, trace);
         }
         add(offensePlayerStats[shotTaker.name], "FTA");
         add(offenseTeamStats, "FTA");
@@ -1386,7 +1483,7 @@ function resolvePossession(
         detail: `${defense.shortName} block range`
       });
       if (block.success) {
-        const blockChoice = weightedChoiceResult(defense, "BLK", options, rng);
+        const blockChoice = weightedChoiceResult(defense, "BLK", options, rng, "", availability);
         const blocker = blockChoice.player;
         addTraceStep(trace, {
           label: "Block assignment",
@@ -1412,7 +1509,7 @@ function resolvePossession(
       detail: extensions >= simParams.maxOrbExtensions ? "Extension limit reached" : `${shotZoneLabel(shotZone)} rebound range`
     });
     if (offensiveRebound.success && extensions < simParams.maxOrbExtensions) {
-      const reboundChoice = weightedChoiceResult(offense, "OREB", options, rng);
+      const reboundChoice = weightedChoiceResult(offense, "OREB", options, rng, "", availability);
       const rebounder = reboundChoice.player;
       addTraceStep(trace, {
         label: "Offensive rebound assignment",
@@ -1430,7 +1527,7 @@ function resolvePossession(
       continue;
     }
 
-    const reboundChoice = weightedChoiceResult(defense, "DREB", options, rng);
+    const reboundChoice = weightedChoiceResult(defense, "DREB", options, rng, "", availability);
     const rebounder = reboundChoice.player;
     addTraceStep(trace, {
       label: "Defensive rebound assignment",
@@ -1454,6 +1551,88 @@ function finalizePlayerStats(stats: Record<string, StatLine>): void {
   }
 }
 
+function finalizeTeamStats(stats: StatLine): void {
+  stats.REB = (stats.OREB ?? 0) + (stats.DREB ?? 0);
+}
+
+function clonePlayerStats(stats: Record<string, StatLine>): Record<string, StatLine> {
+  return Object.fromEntries(
+    Object.entries(stats).map(([player, line]) => [
+      player,
+      {
+        ...line,
+        REB: (line.OREB ?? 0) + (line.DREB ?? 0)
+      }
+    ])
+  );
+}
+
+function cloneTeamStats(stats: StatLine): StatLine {
+  return {
+    ...stats,
+    REB: (stats.OREB ?? 0) + (stats.DREB ?? 0)
+  };
+}
+
+function liveResultSnapshot({
+  seed,
+  away,
+  home,
+  matchup,
+  completedQuarters,
+  awayTeamStats,
+  homeTeamStats,
+  awayPlayerStats,
+  homePlayerStats,
+  availabilityEvents,
+  playedAt
+}: {
+  seed: number;
+  away: DiceTeamCard;
+  home: DiceTeamCard;
+  matchup: MatchupCard;
+  completedQuarters: Array<{ away: number; home: number }>;
+  awayTeamStats: StatLine;
+  homeTeamStats: StatLine;
+  awayPlayerStats: Record<string, StatLine>;
+  homePlayerStats: Record<string, StatLine>;
+  availabilityEvents: NonNullable<GameResult["playerAvailabilityEvents"]>;
+  playedAt: string;
+}): GameResult {
+  const liveAwayTeamStats = cloneTeamStats(awayTeamStats);
+  const liveHomeTeamStats = cloneTeamStats(homeTeamStats);
+  const awayScore = liveAwayTeamStats.PTS ?? 0;
+  const homeScore = liveHomeTeamStats.PTS ?? 0;
+  const completedAwayScore = completedQuarters.reduce((sum, quarter) => sum + quarter.away, 0);
+  const completedHomeScore = completedQuarters.reduce((sum, quarter) => sum + quarter.home, 0);
+  const liveQuarter = {
+    away: awayScore - completedAwayScore,
+    home: homeScore - completedHomeScore
+  };
+
+  return {
+    id: `live-${seed}-${away.id}-at-${home.id}`,
+    awayTeamId: away.id,
+    homeTeamId: home.id,
+    awayScore,
+    homeScore,
+    winnerTeamId: awayScore === homeScore ? "tie" : awayScore > homeScore ? away.id : home.id,
+    possessionsEach: matchup.possessionsEach,
+    quarters: [...completedQuarters.map((quarter) => ({ ...quarter })), liveQuarter],
+    teamStats: {
+      [away.id]: liveAwayTeamStats,
+      [home.id]: liveHomeTeamStats
+    },
+    playerStats: {
+      [away.id]: clonePlayerStats(awayPlayerStats),
+      [home.id]: clonePlayerStats(homePlayerStats)
+    },
+    playerAvailabilityEvents: availabilityEvents.length ? availabilityEvents.map((event) => ({ ...event })) : undefined,
+    source: "simulated",
+    playedAt
+  };
+}
+
 function periodLabel(periodIndex: number): string {
   return periodIndex < 4 ? `Q${periodIndex + 1}` : `OT${periodIndex - 3}`;
 }
@@ -1463,18 +1642,20 @@ function simulateGameInternal(
   home: DiceTeamCard,
   seed: number,
   source: "simulated" | "manual",
-  options: Partial<MatchupOptions>,
+  options: Partial<SimulationOptions>,
   collectTrace: boolean
 ): TracedGameResult {
   const rng = new SeededRandom(seed);
   const matchupOptions = normalizeMatchupOptions(options);
   const matchup = buildMatchupCard(away, home, matchupOptions);
+  const availability = createGameAvailabilityState(away, home, options);
   const awayTeamStats = emptyTeamStats();
   const homeTeamStats = emptyTeamStats();
   const awayPlayerStats = emptyPlayerStats(away);
   const homePlayerStats = emptyPlayerStats(home);
   const quarters: Array<{ away: number; home: number }> = [];
   const possessions: PossessionTrace[] = [];
+  const playedAt = new Date().toISOString();
   let possessionNumber = 0;
 
   const playPossession = (
@@ -1490,8 +1671,8 @@ function simulateGameInternal(
     defenseTeamStats: StatLine
   ) => {
     const offensePointsBefore = offenseTeamStats.PTS;
-    const trace = collectTrace
-      ? ({
+    const trace: PossessionTrace | undefined = collectTrace
+      ? {
           id: `${periodLabel(periodIndex)}-${possessionInPeriod + 1}-${side}`,
           periodIndex,
           periodLabel: periodLabel(periodIndex),
@@ -1510,7 +1691,7 @@ function simulateGameInternal(
           points: 0,
           summary: "",
           steps: []
-        } satisfies PossessionTrace)
+        }
       : undefined;
 
     possessionNumber += 1;
@@ -1524,6 +1705,7 @@ function simulateGameInternal(
       offenseTeamStats,
       defenseTeamStats,
       rng,
+      availability,
       trace
     );
 
@@ -1534,6 +1716,19 @@ function simulateGameInternal(
       };
       trace.points = offenseTeamStats.PTS - offensePointsBefore;
       trace.summary ||= `${offense.shortName} possession`;
+      trace.liveResult = liveResultSnapshot({
+        seed,
+        away,
+        home,
+        matchup,
+        completedQuarters: quarters,
+        awayTeamStats,
+        homeTeamStats,
+        awayPlayerStats,
+        homePlayerStats,
+        availabilityEvents: availability.events,
+        playedAt
+      });
       possessions.push(trace);
     }
   };
@@ -1574,6 +1769,8 @@ function simulateGameInternal(
 
   finalizePlayerStats(awayPlayerStats);
   finalizePlayerStats(homePlayerStats);
+  finalizeTeamStats(awayTeamStats);
+  finalizeTeamStats(homeTeamStats);
 
   const winnerTeamId = awayTeamStats.PTS > homeTeamStats.PTS ? away.id : homeTeamStats.PTS > awayTeamStats.PTS ? home.id : "tie";
 
@@ -1594,8 +1791,9 @@ function simulateGameInternal(
       [away.id]: awayPlayerStats,
       [home.id]: homePlayerStats
     },
+    playerAvailabilityEvents: availability.events.length ? availability.events : undefined,
     source,
-    playedAt: new Date().toISOString()
+    playedAt
   };
 
   return {
@@ -1610,7 +1808,7 @@ export function simulateGame(
   home: DiceTeamCard,
   seed = Date.now(),
   source: "simulated" | "manual" = "simulated",
-  options: Partial<MatchupOptions> = defaultMatchupOptions
+  options: Partial<SimulationOptions> = defaultMatchupOptions
 ): GameResult {
   return simulateGameInternal(away, home, seed, source, options, false).result;
 }
@@ -1619,7 +1817,7 @@ export function simulateTracedGame(
   away: DiceTeamCard,
   home: DiceTeamCard,
   seed = Date.now(),
-  options: Partial<MatchupOptions> = defaultMatchupOptions
+  options: Partial<SimulationOptions> = defaultMatchupOptions
 ): TracedGameResult {
   return simulateGameInternal(away, home, seed, "simulated", options, true);
 }
@@ -1629,7 +1827,7 @@ export function summarizeSimulations(
   home: DiceTeamCard,
   games: number,
   seed = Date.now(),
-  options: Partial<MatchupOptions> = defaultMatchupOptions
+  options: Partial<SimulationOptions> = defaultMatchupOptions
 ) {
   const rng = new SeededRandom(seed);
   const teamTotals: Record<string, StatLine[]> = { [away.id]: [], [home.id]: [] };

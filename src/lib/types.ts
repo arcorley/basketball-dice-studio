@@ -12,6 +12,12 @@ export interface MatchupOptions {
   intensity: SimIntensity;
 }
 
+export type PlayerUnavailableReason = "taken-away" | "fouled-out";
+
+export interface SimulationOptions extends MatchupOptions {
+  unavailablePlayerIds?: string[];
+}
+
 export interface MatchupContext {
   label: string;
   venue: SimVenue;
@@ -543,8 +549,19 @@ export interface GameResult {
   quarters: Array<{ away: number; home: number }>;
   teamStats: Record<string, StatLine>;
   playerStats: Record<string, Record<string, StatLine>>;
+  playerAvailabilityEvents?: PlayerAvailabilityEvent[];
   source: "simulated" | "manual";
   playedAt: string;
+}
+
+export interface PlayerAvailabilityEvent {
+  teamId: string;
+  playerId: string;
+  player: string;
+  reason: PlayerUnavailableReason;
+  fouls?: number;
+  periodLabel?: string;
+  possessionNumber?: number;
 }
 
 export interface RollTraceStep {
@@ -574,6 +591,7 @@ export interface PossessionTrace {
   points: number;
   summary: string;
   steps: RollTraceStep[];
+  liveResult?: GameResult;
 }
 
 export interface TracedGameResult {
@@ -598,6 +616,8 @@ export interface LeagueState {
   name: string;
   teamIds: string[];
   games: LeagueGame[];
+  currentDate?: string;
+  focusTeamId?: string;
   createdAt: string;
   updatedAt: string;
 }

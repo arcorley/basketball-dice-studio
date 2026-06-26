@@ -7,6 +7,11 @@ export interface SeasonLeagueCollectionState {
   activeLeagueId: string | null;
 }
 
+export interface LoadedSeasonLeagueCollectionState {
+  collection: SeasonLeagueCollectionState;
+  hasStoredCollection: boolean;
+}
+
 function isLeagueState(value: unknown): value is LeagueState {
   if (!value || typeof value !== "object") return false;
   const candidate = value as Partial<LeagueState>;
@@ -94,9 +99,20 @@ export function saveSeasonLeague(league: LeagueState | null): Promise<void> {
 }
 
 export async function loadSeasonLeagues(): Promise<SeasonLeagueCollectionState> {
-  return normalizeSeasonLeagueCollection(await loadStateValue("season-leagues"));
+  return (await loadSeasonLeagueCollection()).collection;
+}
+
+export async function loadSeasonLeagueCollection(): Promise<LoadedSeasonLeagueCollectionState> {
+  const state = await loadStateValue("season-leagues");
+  return {
+    collection: normalizeSeasonLeagueCollection(state),
+    hasStoredCollection: Boolean(state && typeof state === "object")
+  };
 }
 
 export function saveSeasonLeagues(collection: SeasonLeagueCollectionState): Promise<void> {
-  return saveStateValue("season-leagues", normalizeSeasonLeagueCollection(collection));
+  return Promise.all([
+    saveStateValue("season-leagues", normalizeSeasonLeagueCollection(collection)),
+    saveStateValue("season-league", null)
+  ]).then(() => undefined);
 }

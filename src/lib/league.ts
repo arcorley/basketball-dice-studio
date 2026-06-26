@@ -289,12 +289,23 @@ export function createSeasonLeague(name: string, teamIds: string[], gamesPerTeam
     name,
     teamIds: teams,
     games: assignSeasonDates(games, seasonStartDate),
+    currentDate: seasonStartDate,
+    focusTeamId: teams[0],
     createdAt: now,
     updatedAt: now
   };
 }
 
 export const createLeague = createTournament;
+
+export function renameLeague(league: LeagueState, name: string): LeagueState {
+  const trimmedName = name.trim();
+  return {
+    ...league,
+    name: trimmedName || league.name,
+    updatedAt: new Date().toISOString()
+  };
+}
 
 export function simulateLeagueGameWithTeams(league: LeagueState, gameId: string, away: DiceTeamCard, home: DiceTeamCard, seed = Date.now()): LeagueState {
   return updateGame(league, gameId, (game) => {
@@ -328,6 +339,22 @@ export function markUnplayed(league: LeagueState, gameId: string): LeagueState {
     status: "unplayed",
     result: undefined
   }));
+}
+
+export function setLeagueCurrentDate(league: LeagueState, currentDate: string): LeagueState {
+  return {
+    ...league,
+    currentDate,
+    updatedAt: new Date().toISOString()
+  };
+}
+
+export function setLeagueFocusTeam(league: LeagueState, focusTeamId: string | null): LeagueState {
+  return {
+    ...league,
+    focusTeamId: focusTeamId ?? undefined,
+    updatedAt: new Date().toISOString()
+  };
 }
 
 function updateGame(league: LeagueState, gameId: string, updater: (game: LeagueGame) => LeagueGame): LeagueState {
@@ -394,9 +421,14 @@ export function aggregateTeamStats(league: LeagueState): Record<string, StatLine
     if (!game.result) continue;
     for (const teamId of [game.awayTeamId, game.homeTeamId]) {
       const target = rows[teamId];
+      const line = game.result.teamStats[teamId] ?? {};
       target.games += 1;
-      for (const [field, value] of Object.entries(game.result.teamStats[teamId] ?? {})) {
+      for (const [field, value] of Object.entries(line)) {
+        if (field === "REB") continue;
         target[field] = (target[field] ?? 0) + value;
+      }
+      if (line.REB !== undefined || line.OREB !== undefined || line.DREB !== undefined) {
+        target.REB = (target.REB ?? 0) + Math.max(line.REB ?? 0, (line.OREB ?? 0) + (line.DREB ?? 0));
       }
     }
   }
