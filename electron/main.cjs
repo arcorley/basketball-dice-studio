@@ -5,6 +5,7 @@ const path = require("node:path");
 const APP_SCHEME = "bds";
 const APP_HOST = "basketball-dice-studio";
 const VALID_STATE_KEYS = new Set(["tournament", "season-league", "season-leagues"]);
+let appStateStoreQueue = Promise.resolve();
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -118,9 +119,20 @@ async function readAppStateStore() {
 async function writeAppStateStore(store) {
   const destination = appStatePath();
   await fs.mkdir(path.dirname(destination), { recursive: true });
-  const temporary = `${destination}.tmp`;
-  await fs.writeFile(temporary, JSON.stringify(store, null, 2), "utf8");
-  await fs.rename(temporary, destination);
+  const temporary = `${destination}.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`;
+  try {
+    await fs.writeFile(temporary, JSON.stringify(store, null, 2), "utf8");
+    await fs.rename(temporary, destination);
+  } catch (error) {
+    await fs.unlink(temporary).catch(() => {});
+    throw error;
+  }
+}
+
+function queueAppStateStoreOperation(operation) {
+  const queued = appStateStoreQueue.then(operation, operation);
+  appStateStoreQueue = queued.catch(() => {});
+  return queued;
 }
 
 async function handleAppStateRequest(request, url) {
@@ -132,40 +144,42 @@ async function handleAppStateRequest(request, url) {
     return textResponse("Unknown app state key.", 404);
   }
 
-  const store = await readAppStateStore();
-  if (request.method === "GET") {
-    const value = isValidStateValue(key, store[key]) ? store[key] : null;
-    if (store[key] && !value) {
+  return queueAppStateStoreOperation(async () => {
+    const store = await readAppStateStore();
+    if (request.method === "GET") {
+      const value = isValidStateValue(key, store[key]) ? store[key] : null;
+      if (store[key] && !value) {
+        delete store[key];
+        await writeAppStateStore(store);
+      }
+      return jsonResponse({ state: value });
+    }
+
+    if (request.method === "PUT") {
+      let value;
+      try {
+        value = JSON.parse(await request.text());
+      } catch {
+        return jsonResponse({ error: "Invalid JSON payload." }, 400);
+      }
+
+      if (!isValidStateValue(key, value)) {
+        return jsonResponse({ error: "Invalid app state payload." }, 400);
+      }
+
+      store[key] = value;
+      await writeAppStateStore(store);
+      return jsonResponse({ ok: true });
+    }
+
+    if (request.method === "DELETE") {
       delete store[key];
       await writeAppStateStore(store);
-    }
-    return jsonResponse({ state: value });
-  }
-
-  if (request.method === "PUT") {
-    let value;
-    try {
-      value = JSON.parse(await request.text());
-    } catch {
-      return jsonResponse({ error: "Invalid JSON payload." }, 400);
+      return jsonResponse({ ok: true });
     }
 
-    if (!isValidStateValue(key, value)) {
-      return jsonResponse({ error: "Invalid app state payload." }, 400);
-    }
-
-    store[key] = value;
-    await writeAppStateStore(store);
-    return jsonResponse({ ok: true });
-  }
-
-  if (request.method === "DELETE") {
-    delete store[key];
-    await writeAppStateStore(store);
-    return jsonResponse({ ok: true });
-  }
-
-  return jsonResponse({ error: "Method not allowed." }, 405);
+    return jsonResponse({ error: "Method not allowed." }, 405);
+  });
 }
 
 function distPathFor(url) {

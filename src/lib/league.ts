@@ -1054,11 +1054,12 @@ export function setLeagueFocusTeam(league: LeagueState, focusTeamId: string | nu
 }
 
 function updateGame(league: LeagueState, gameId: string, updater: (game: LeagueGame) => LeagueGame): LeagueState {
-  return {
+  const nextLeague = {
     ...league,
     games: league.games.map((game) => (game.id === gameId ? updater(game) : game)),
     updatedAt: new Date().toISOString()
   };
+  return syncLeaguePlayoffs(nextLeague);
 }
 
 export function standings(league: LeagueState) {

@@ -110,9 +110,7 @@ export async function loadSeasonLeagueCollection(): Promise<LoadedSeasonLeagueCo
   };
 }
 
-export function saveSeasonLeagues(collection: SeasonLeagueCollectionState): Promise<void> {
-  return Promise.all([
-    saveStateValue("season-leagues", normalizeSeasonLeagueCollection(collection)),
-    saveStateValue("season-league", null)
-  ]).then(() => undefined);
+export async function saveSeasonLeagues(collection: SeasonLeagueCollectionState): Promise<void> {
+  await saveStateValue("season-leagues", normalizeSeasonLeagueCollection(collection));
+  await saveStateValue("season-league", null);
 }

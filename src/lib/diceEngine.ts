@@ -357,7 +357,7 @@ function weightedRate(items: Array<[number | null | undefined, number]>): number
 type PlayerStatProfile = SourcePlayer | SourcePlayerPostseasonProfile;
 
 function playerStatProfile(player: DicePlayerCard, options: MatchupOptions): PlayerStatProfile {
-  return options.intensity === "playoff" && player.source.postseason ? player.source.postseason : player.source;
+  return options.intensity === "playoff" && player.playoffWeightSource === "postseason" && player.source.postseason ? player.source.postseason : player.source;
 }
 
 function sourcedRate(made: number | null | undefined, attempts: number, label: string): number | null {
@@ -454,6 +454,17 @@ function hasCompleteLocationProfile(profile: SourceShotLocationProfile | null | 
   ].every(([share, make]) => Number(share) <= 0 || isFiniteSource(make));
 }
 
+function hasPositiveTwoPointZone(profile: SourceShotLocationProfile | null | undefined): profile is SourceShotLocationProfile {
+  if (!profile) return false;
+  return [profile.pctFga00_03, profile.pctFga03_10, profile.pctFga10_16, profile.pctFga16_xx].some(
+    (value) => value !== null && value !== undefined && Number.isFinite(value) && value > 0
+  );
+}
+
+function hasUsableLocationProfile(profile: SourceShotLocationProfile | null | undefined): profile is SourceShotLocationProfile {
+  return hasCompleteLocationProfile(profile) && hasPositiveTwoPointZone(profile);
+}
+
 function postseasonShotLocationProfile(player: DicePlayerCard, profile: PlayerStatProfile): SourceShotLocationProfile | null {
   if (profile === player.source) return null;
   const shooting = profile.shooting;
@@ -477,7 +488,7 @@ function postseasonShotLocationProfile(player: DicePlayerCard, profile: PlayerSt
     fgPct16_xx: shooting.fgPct16_xx,
     fgPct3p: shooting.fgPct3p
   };
-  return hasCompleteLocationProfile(postseasonProfile) ? postseasonProfile : null;
+  return hasUsableLocationProfile(postseasonProfile) ? postseasonProfile : null;
 }
 
 function matchupShotZoneProfile(
@@ -487,7 +498,7 @@ function matchupShotZoneProfile(
   profileSource: PlayerStatProfile
 ): Pick<MatchupPlayerProfile, "shotProfile" | "shotProfileMethod" | "shotProfileConfidence" | "twoZoneShares" | "shotMakes"> {
   const shooting = postseasonShotLocationProfile(player, profileSource) ?? player.source.shotLocationProfile;
-  if (!hasCompleteLocationProfile(shooting)) {
+  if (!hasUsableLocationProfile(shooting)) {
     throw new Error(`${player.name} is missing a sourced or derived shot-location profile.`);
   }
 
