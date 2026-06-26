@@ -4,7 +4,7 @@ const path = require("node:path");
 
 const APP_SCHEME = "bds";
 const APP_HOST = "basketball-dice-studio";
-const VALID_STATE_KEYS = new Set(["tournament", "season-league"]);
+const VALID_STATE_KEYS = new Set(["tournament", "season-league", "season-leagues"]);
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -29,6 +29,23 @@ function isLeagueState(value) {
     typeof value.createdAt === "string" &&
     typeof value.updatedAt === "string"
   );
+}
+
+function isSeasonLeagueCollection(value) {
+  return (
+    value &&
+    typeof value === "object" &&
+    Array.isArray(value.leagues) &&
+    value.leagues.every(isLeagueState) &&
+    (value.activeLeagueId === null || typeof value.activeLeagueId === "string")
+  );
+}
+
+function isValidStateValue(key, value) {
+  if (key === "season-leagues") {
+    return isSeasonLeagueCollection(value);
+  }
+  return isLeagueState(value);
 }
 
 function jsonResponse(payload, status = 200) {
@@ -117,7 +134,7 @@ async function handleAppStateRequest(request, url) {
 
   const store = await readAppStateStore();
   if (request.method === "GET") {
-    const value = isLeagueState(store[key]) ? store[key] : null;
+    const value = isValidStateValue(key, store[key]) ? store[key] : null;
     if (store[key] && !value) {
       delete store[key];
       await writeAppStateStore(store);
@@ -133,8 +150,8 @@ async function handleAppStateRequest(request, url) {
       return jsonResponse({ error: "Invalid JSON payload." }, 400);
     }
 
-    if (!isLeagueState(value)) {
-      return jsonResponse({ error: "Invalid LeagueState payload." }, 400);
+    if (!isValidStateValue(key, value)) {
+      return jsonResponse({ error: "Invalid app state payload." }, 400);
     }
 
     store[key] = value;
