@@ -72,6 +72,7 @@ type SimulatorMode = "play" | "simulate";
 type SimulationRunMode = "single" | "batch";
 type WatchGameView = "game" | "box";
 type CompetitionSection = "schedule" | "standings" | "leaders" | "team";
+type PostseasonBracketView = "playoffs" | "play-in";
 type LeaguePreset = "season" | "franchise-best" | "best-record";
 type LeagueStatusFilter = "all" | "unplayed" | "played" | "simulated" | "manual";
 type LeagueViewMode = "select" | "create" | "play";
@@ -3739,6 +3740,9 @@ function SeasonLeagueView({
     })?.date ?? firstScheduleDate;
   const regularSeasonComplete = regularScheduledGames.length > 0 && regularScheduledGames.every((game) => game.status !== "unplayed");
   const postseasonSeeds = useMemo(() => (league ? playoffSeedsForLeague(league, sourceTeamsById) : []), [league, sourceTeamsById]);
+  const postseasonChampionTeamId = useMemo(() => (league ? leaguePlayoffChampionTeamId(league) : undefined), [league]);
+  const postseasonComplete = Boolean(postseasonChampionTeamId);
+  const activeSection: CompetitionSection = postseasonComplete && section === "schedule" ? "leaders" : section;
   const currentRecord = (teamId: string) => leagueRecordByTeamId.get(teamId) ?? "0-0";
   const matchupRecordLabel = (game: Pick<LeagueGame, "awayTeamId" | "homeTeamId">): string =>
     `${currentRecord(game.awayTeamId)} at ${currentRecord(game.homeTeamId)}`;
@@ -3792,6 +3796,12 @@ function SeasonLeagueView({
     const syncedLeague = syncLeaguePlayoffs(league);
     if (syncedLeague !== league) setLeague(syncedLeague);
   }, [league, setLeague]);
+
+  useEffect(() => {
+    if (!postseasonComplete) return;
+    if (section === "schedule") setSection("leaders");
+    setBatchRequest((current) => (current ? null : current));
+  }, [postseasonComplete, section]);
 
   useEffect(() => {
     setBatchRequest(null);
@@ -4293,153 +4303,164 @@ function SeasonLeagueView({
 
       {mode === "play" && league && (
         <>
-          <article className="panel league-command-center">
-            <div className="league-clock">
-              <span>League Date</span>
-              <strong>{formatLeagueClock(currentLeagueDate)}</strong>
-              <small>
-                {currentDateFeatureGame
-                  ? `Today: ${leagueGameLabel(currentDateFeatureGame, teamNames)}`
-                  : nextLeagueGame
-                    ? `Next tip: ${formatIsoDate(nextLeagueGame.date)} · ${leagueGameLabel(nextLeagueGame, teamNames)}`
-                    : "No remaining games on the schedule"}
-              </small>
-            </div>
-            <div className="league-command-main">
-              <div>
-                {renamingLeagueId === league.id ? (
-                  <form
-                    className="league-title-edit"
-                    onSubmit={(event) => {
-                      event.preventDefault();
-                      saveLeagueRename(league);
+          {postseasonComplete && postseasonChampionTeamId ? (
+            <LeagueCompletionBanner
+              league={league}
+              championTeamId={postseasonChampionTeamId}
+              teamNames={teamNames}
+              sourceTeamsById={sourceTeamsById}
+            />
+          ) : (
+            <article className="panel league-command-center">
+              <div className="league-clock">
+                <span>League Date</span>
+                <strong>{formatLeagueClock(currentLeagueDate)}</strong>
+                <small>
+                  {currentDateFeatureGame
+                    ? `Today: ${leagueGameLabel(currentDateFeatureGame, teamNames)}`
+                    : nextLeagueGame
+                      ? `Next tip: ${formatIsoDate(nextLeagueGame.date)} · ${leagueGameLabel(nextLeagueGame, teamNames)}`
+                      : "No remaining games on the schedule"}
+                </small>
+              </div>
+              <div className="league-command-main">
+                <div>
+                  {renamingLeagueId === league.id ? (
+                    <form
+                      className="league-title-edit"
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        saveLeagueRename(league);
+                      }}
+                    >
+                      <input
+                        aria-label="League name"
+                        value={renameDraft}
+                        autoFocus
+                        onChange={(event) => setRenameDraft(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Escape") {
+                            event.preventDefault();
+                            cancelLeagueRename();
+                          }
+                        }}
+                      />
+                      <Button type="submit" icon={<Check size={14} />} variant="primary" disabled={!renameDraft.trim()}>
+                        Save
+                      </Button>
+                      <Button type="button" icon={<X size={14} />} onClick={cancelLeagueRename}>
+                        Cancel
+                      </Button>
+                    </form>
+                  ) : (
+                    <div className="league-title-row">
+                      <h3>{league.name}</h3>
+                      <Button icon={<Pencil size={14} />} onClick={() => beginLeagueRename(league)}>
+                        Rename
+                      </Button>
+                    </div>
+                  )}
+                  <p>
+                    {league.teamIds.length.toLocaleString()} teams · {scheduleRangeLabel(regularScheduledGames)}
+                  </p>
+                </div>
+                <div className="league-next-stack">
+                  <div>
+                    <span>Next game</span>
+                    <strong>{nextLeagueGame ? leagueGameLabel(nextLeagueGame, teamNames) : "Season complete"}</strong>
+                    <small>{nextLeagueGame ? `${formatIsoDate(nextLeagueGame.date)} · ${matchupRecordLabel(nextLeagueGame)}` : "No unplayed games remain"}</small>
+                  </div>
+                  <div>
+                    <span>Focus team</span>
+                    <strong>{focusTeamId === allTeamsValue ? "Choose team" : teamLabel(teamNames, focusTeamId)}</strong>
+                    <small>{nextFocusTeamGame ? `${formatIsoDate(nextFocusTeamGame.date)} · ${leagueGameLabel(nextFocusTeamGame, teamNames)} · ${matchupRecordLabel(nextFocusTeamGame)}` : "No remaining game"}</small>
+                  </div>
+                </div>
+              </div>
+              <div className="league-advance-bar">
+                <label className="league-focus-select">
+                  Focus team
+                  <select value={focusTeamId} onChange={(event) => changeFocusTeam(event.target.value)}>
+                    <option value={allTeamsValue}>Choose team</option>
+                    {leagueTeamEntries.map((team) => (
+                      <option key={team.id} value={team.id}>
+                        {team.shortName}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <div className="league-advance-actions">
+                  <Button
+                    icon={<Play size={16} />}
+                    disabled={!nextLeagueGame || Boolean(pendingGameId)}
+                    onClick={() => {
+                      setSection("schedule");
+                      previewNextLeagueGame();
                     }}
                   >
-                    <input
-                      aria-label="League name"
-                      value={renameDraft}
-                      autoFocus
-                      onChange={(event) => setRenameDraft(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Escape") {
-                          event.preventDefault();
-                          cancelLeagueRename();
-                        }
-                      }}
-                    />
-                    <Button type="submit" icon={<Check size={14} />} variant="primary" disabled={!renameDraft.trim()}>
-                      Save
-                    </Button>
-                    <Button type="button" icon={<X size={14} />} onClick={cancelLeagueRename}>
-                      Cancel
-                    </Button>
-                  </form>
-                ) : (
-                  <div className="league-title-row">
-                    <h3>{league.name}</h3>
-                    <Button icon={<Pencil size={14} />} onClick={() => beginLeagueRename(league)}>
-                      Rename
-                    </Button>
-                  </div>
-                )}
-                <p>
-                  {league.teamIds.length.toLocaleString()} teams · {scheduleRangeLabel(regularScheduledGames)}
-                </p>
-              </div>
-              <div className="league-next-stack">
-                <div>
-                  <span>Next game</span>
-                  <strong>{nextLeagueGame ? leagueGameLabel(nextLeagueGame, teamNames) : "Season complete"}</strong>
-                  <small>{nextLeagueGame ? `${formatIsoDate(nextLeagueGame.date)} · ${matchupRecordLabel(nextLeagueGame)}` : "No unplayed games remain"}</small>
+                    Sim Next Game
+                  </Button>
+                  <Button
+                    icon={<SkipForward size={16} />}
+                    disabled={!nextFocusTeamGame || Boolean(pendingGameId)}
+                    variant="primary"
+                    onClick={() => {
+                      setSection("schedule");
+                      previewNextFocusTeamGame();
+                    }}
+                  >
+                    Sim to Team Game
+                  </Button>
+                  <Button
+                    icon={<CalendarDays size={16} />}
+                    disabled={!currentLeagueDate || Boolean(pendingGameId)}
+                    onClick={() => {
+                      setSection("schedule");
+                      previewAdvanceThrough("Advance today", currentLeagueDate, "Sim Day");
+                    }}
+                  >
+                    Sim Day
+                  </Button>
+                  <Button
+                    icon={<CalendarDays size={16} />}
+                    disabled={!currentWeekEnd || Boolean(pendingGameId)}
+                    onClick={() => {
+                      setSection("schedule");
+                      previewAdvanceThrough("Advance one week", currentWeekEnd, "Sim Week");
+                    }}
+                  >
+                    Sim Week
+                  </Button>
+                  <Button
+                    icon={<CalendarDays size={16} />}
+                    disabled={!currentMonthEnd || Boolean(pendingGameId)}
+                    onClick={() => {
+                      setSection("schedule");
+                      previewAdvanceThrough("Advance one month", currentMonthEnd, "Sim Month");
+                    }}
+                  >
+                    Sim Month
+                  </Button>
                 </div>
-                <div>
-                  <span>Focus team</span>
-                  <strong>{focusTeamId === allTeamsValue ? "Choose team" : teamLabel(teamNames, focusTeamId)}</strong>
-                  <small>{nextFocusTeamGame ? `${formatIsoDate(nextFocusTeamGame.date)} · ${leagueGameLabel(nextFocusTeamGame, teamNames)} · ${matchupRecordLabel(nextFocusTeamGame)}` : "No remaining game"}</small>
-                </div>
               </div>
-            </div>
-            <div className="league-advance-bar">
-              <label className="league-focus-select">
-                Focus team
-                <select value={focusTeamId} onChange={(event) => changeFocusTeam(event.target.value)}>
-                  <option value={allTeamsValue}>Choose team</option>
-                  {leagueTeamEntries.map((team) => (
-                    <option key={team.id} value={team.id}>
-                      {team.shortName}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <div className="league-advance-actions">
-                <Button
-                  icon={<Play size={16} />}
-                  disabled={!nextLeagueGame || Boolean(pendingGameId)}
-                  onClick={() => {
-                    setSection("schedule");
-                    previewNextLeagueGame();
-                  }}
-                >
-                  Sim Next Game
-                </Button>
-                <Button
-                  icon={<SkipForward size={16} />}
-                  disabled={!nextFocusTeamGame || Boolean(pendingGameId)}
-                  variant="primary"
-                  onClick={() => {
-                    setSection("schedule");
-                    previewNextFocusTeamGame();
-                  }}
-                >
-                  Sim to Team Game
-                </Button>
-                <Button
-                  icon={<CalendarDays size={16} />}
-                  disabled={!currentLeagueDate || Boolean(pendingGameId)}
-                  onClick={() => {
-                    setSection("schedule");
-                    previewAdvanceThrough("Advance today", currentLeagueDate, "Sim Day");
-                  }}
-                >
-                  Sim Day
-                </Button>
-                <Button
-                  icon={<CalendarDays size={16} />}
-                  disabled={!currentWeekEnd || Boolean(pendingGameId)}
-                  onClick={() => {
-                    setSection("schedule");
-                    previewAdvanceThrough("Advance one week", currentWeekEnd, "Sim Week");
-                  }}
-                >
-                  Sim Week
-                </Button>
-                <Button
-                  icon={<CalendarDays size={16} />}
-                  disabled={!currentMonthEnd || Boolean(pendingGameId)}
-                  onClick={() => {
-                    setSection("schedule");
-                    previewAdvanceThrough("Advance one month", currentMonthEnd, "Sim Month");
-                  }}
-                >
-                  Sim Month
-                </Button>
-              </div>
-            </div>
-          </article>
+            </article>
+          )}
           <div className="mode-tabs league-tabs">
-            <button type="button" className={section === "schedule" ? "active" : ""} onClick={() => setSection("schedule")}>
-              <CalendarDays size={16} />
-              <span>Schedule</span>
-            </button>
-            <button type="button" className={section === "team" ? "active" : ""} onClick={() => setSection("team")}>
+            {!postseasonComplete && (
+              <button type="button" className={activeSection === "schedule" ? "active" : ""} onClick={() => setSection("schedule")}>
+                <CalendarDays size={16} />
+                <span>Schedule</span>
+              </button>
+            )}
+            <button type="button" className={activeSection === "team" ? "active" : ""} onClick={() => setSection("team")}>
               <BookOpen size={16} />
               <span>Team</span>
             </button>
-            <button type="button" className={section === "standings" ? "active" : ""} onClick={() => setSection("standings")}>
+            <button type="button" className={activeSection === "standings" ? "active" : ""} onClick={() => setSection("standings")}>
               <BarChart3 size={16} />
               <span>Standings</span>
             </button>
-            <button type="button" className={section === "leaders" ? "active" : ""} onClick={() => setSection("leaders")}>
+            <button type="button" className={activeSection === "leaders" ? "active" : ""} onClick={() => setSection("leaders")}>
               <Trophy size={16} />
               <span>Leaders</span>
             </button>
@@ -4450,7 +4471,7 @@ function SeasonLeagueView({
               <p>{leagueError}</p>
             </article>
           )}
-          {section === "schedule" && (regularSeasonComplete || league.playoffs ? (
+          {activeSection === "schedule" && !postseasonComplete && (regularSeasonComplete || league.playoffs ? (
             <LeaguePostseasonPanel
               league={league}
               seeds={postseasonSeeds}
@@ -4472,6 +4493,7 @@ function SeasonLeagueView({
               onManual={(game) => setManualGame(game)}
               onSim={(game) => void simulateGameInLeague(game)}
               onReset={(game) => commitLeague(markUnplayed(league, game.id))}
+              onOpenGame={(game) => setInfoGame(game)}
             />
           ) : (
             <article className="panel schedule-panel">
@@ -4660,7 +4682,7 @@ function SeasonLeagueView({
               )}
             </article>
           ))}
-          {section === "team" && (
+          {activeSection === "team" && (
             <LeagueTeamDashboard
               league={league}
               teamId={focusTeamId}
@@ -4672,8 +4694,8 @@ function SeasonLeagueView({
               onOpenGame={setInfoGame}
             />
           )}
-          {section === "standings" && <StandingsTable league={league} teamNames={teamNames} sourceTeamsById={sourceTeamsById} />}
-          {section === "leaders" && <LeagueLeaders league={league} teamNames={teamNames} sourceTeamsById={sourceTeamsById} />}
+          {activeSection === "standings" && <StandingsTable league={league} teamNames={teamNames} sourceTeamsById={sourceTeamsById} />}
+          {activeSection === "leaders" && <LeagueLeaders league={league} teamNames={teamNames} sourceTeamsById={sourceTeamsById} />}
           {manualGame && (
             <ManualResultFormLoader
               game={manualGame}
@@ -4700,6 +4722,7 @@ function SeasonLeagueView({
               sourceTeamsById={sourceTeamsById}
               loadTeam={loadTeam}
               pending={Boolean(pendingGameId)}
+              readOnly={postseasonComplete}
               onClose={() => setInfoGame(null)}
               onWatch={() => {
                 setWatchGame(infoGame);
@@ -4773,6 +4796,72 @@ function statInputKey(team: DiceTeamCard, player: string): string {
   return `${team.id}:${player}`;
 }
 
+function leaguePlayoffChampionTeamId(league: LeagueState): string | undefined {
+  const finalsSeries = league.playoffs?.series.find((series) => series.round === 4);
+  return finalsSeries ? playoffSeriesState(league, finalsSeries).winnerTeamId : undefined;
+}
+
+function LeagueCompletionBanner({
+  league,
+  championTeamId,
+  teamNames,
+  sourceTeamsById
+}: {
+  league: LeagueState;
+  championTeamId: string;
+  teamNames: Map<string, string>;
+  sourceTeamsById: Map<string, SourceTeamCatalogEntry>;
+}) {
+  const finalSeries = league.playoffs?.series.find((series) => series.round === 4);
+  const finalState = finalSeries ? playoffSeriesState(league, finalSeries) : undefined;
+  const championFinalWins = finalSeries?.teamAId === championTeamId ? finalState?.winsA : finalState?.winsB;
+  const opponentFinalWins = finalSeries?.teamAId === championTeamId ? finalState?.winsB : finalState?.winsA;
+  const finalRecord = championFinalWins !== undefined && opponentFinalWins !== undefined ? `${championFinalWins}-${opponentFinalWins}` : "-";
+  const championStanding = standings(league).find((row) => row.teamId === championTeamId);
+  const championStats = aggregateTeamStats(league)[championTeamId];
+  const regularGames = championStats?.games ?? championStanding?.played ?? 0;
+  const postseasonPlayed = scheduleLeagueGames(league).filter((game) => isPostseasonGame(game) && game.result).length;
+
+  return (
+    <article className="panel league-complete-banner">
+      <div className="league-complete-status">
+        <span className="badge">Playoffs Complete</span>
+        <div>
+          <h3>{teamLabel(teamNames, championTeamId)} Champion</h3>
+          <p>{league.name}</p>
+        </div>
+      </div>
+      <div className="league-complete-team">
+        <Trophy size={28} aria-hidden="true" />
+        <TeamIdentityButton
+          team={sourceTeamsById.get(championTeamId)}
+          teamId={championTeamId}
+          teamNames={teamNames}
+          className="standings-team league-complete-team-identity"
+        />
+      </div>
+      <div className="league-complete-metrics">
+        <div>
+          <span>Finals</span>
+          <strong>{finalRecord}</strong>
+        </div>
+        <div>
+          <span>Record</span>
+          <strong>{standingsRecordLabel(championStanding)}</strong>
+        </div>
+        <div>
+          <span>PPG</span>
+          <strong>{round((championStats?.PTS ?? 0) / Math.max(1, regularGames))}</strong>
+        </div>
+        <div>
+          <span>Postseason Games</span>
+          <strong>{postseasonPlayed}</strong>
+        </div>
+      </div>
+    </article>
+  );
+}
+
 function LeaguePostseasonPanel({
   league,
   seeds,
@@ -4786,7 +4875,8 @@ function LeaguePostseasonPanel({
   onWatch,
   onManual,
   onSim,
-  onReset
+  onReset,
+  onOpenGame
 }: {
   league: LeagueState;
   seeds: LeaguePlayoffSeed[];
@@ -4801,6 +4891,7 @@ function LeaguePostseasonPanel({
   onManual: (game: ScheduledLeagueGame) => void;
   onSim: (game: ScheduledLeagueGame) => void;
   onReset: (game: ScheduledLeagueGame) => void;
+  onOpenGame: (game: ScheduledLeagueGame) => void;
 }) {
   const playoffs = league.playoffs;
   const scheduledById = useMemo(() => new Map(postseasonGames.map((game) => [game.id, game])), [postseasonGames]);
@@ -4812,6 +4903,23 @@ function LeaguePostseasonPanel({
   const championTeamId = championSeries ? playoffSeriesState(league, championSeries).winnerTeamId : undefined;
   const playInGroups = groupedRows(playoffs?.playInGames ?? [], (game) => game.conference, standingsConferenceOrder);
   const seriesRounds = Array.from(new Set((playoffs?.series ?? []).map((series) => series.round))).sort((a, b) => a - b);
+  const hasPlayoffBracket = seriesRounds.length > 0;
+  const [bracketView, setBracketView] = useState<PostseasonBracketView>(hasPlayoffBracket ? "playoffs" : "play-in");
+  const [selectedSeriesId, setSelectedSeriesId] = useState<string | null>(null);
+  const selectedSeries = playoffs?.series.find((series) => series.id === selectedSeriesId);
+  const selectedSeriesState = selectedSeries ? playoffSeriesState(league, selectedSeries) : null;
+  const selectedSeriesGames = selectedSeries ? selectedSeries.gameIds.map((gameId) => scheduledById.get(gameId)).filter((game): game is ScheduledLeagueGame => Boolean(game)) : [];
+
+  useEffect(() => {
+    if (!playoffs) return;
+    setBracketView(hasPlayoffBracket ? "playoffs" : "play-in");
+  }, [hasPlayoffBracket, playoffs?.createdAt]);
+
+  useEffect(() => {
+    if (selectedSeriesId && !playoffs?.series.some((series) => series.id === selectedSeriesId)) {
+      setSelectedSeriesId(null);
+    }
+  }, [playoffs?.series, selectedSeriesId]);
 
   const renderGameActions = (game: ScheduledLeagueGame | undefined) => {
     if (!game) return null;
@@ -4836,6 +4944,11 @@ function LeaguePostseasonPanel({
         )}
       </div>
     );
+  };
+
+  const openGameFromModal = (game: ScheduledLeagueGame) => {
+    setSelectedSeriesId(null);
+    onOpenGame(game);
   };
 
   const renderPostseasonTeam = (teamId: string, seed?: number, wins?: number, game?: ScheduledLeagueGame) => {
@@ -4876,6 +4989,16 @@ function LeaguePostseasonPanel({
             </Button>
           ) : (
             <>
+              <div className="segmented postseason-view-toggle" aria-label="Postseason bracket view">
+                <div className="segment-buttons">
+                  <button type="button" className={bracketView === "playoffs" ? "active" : ""} disabled={!hasPlayoffBracket} onClick={() => setBracketView("playoffs")}>
+                    Playoffs
+                  </button>
+                  <button type="button" className={bracketView === "play-in" ? "active" : ""} onClick={() => setBracketView("play-in")}>
+                    Play-In
+                  </button>
+                </div>
+              </div>
               {nextScheduledGame && (
                 <Button icon={<SkipForward size={16} />} variant="primary" disabled={pending} onClick={() => onSim(nextScheduledGame)}>
                   Sim Next
@@ -4913,85 +5036,426 @@ function LeaguePostseasonPanel({
         </div>
       ) : (
         <>
-          <section className="postseason-section">
-            <div className="team-card-section-title">
-              <h4>Play-In Tournament</h4>
-              <span>{postseasonGames.filter((game) => game.stage === "play-in").length.toLocaleString()} games</span>
-            </div>
-            <div className="postseason-playin-grid">
-              {playInGroups.map((group) => (
-                <section key={group.label} className="postseason-conference">
-                  <h5>{group.label}</h5>
-                  <div className="postseason-game-stack">
-                    {group.rows.map((row) => {
-                      const game = scheduledById.get(row.gameId);
-                      const winnerTeamId = game?.result?.winnerTeamId && game.result.winnerTeamId !== "tie" ? game.result.winnerTeamId : undefined;
-                      return (
-                        <div key={row.id} className={`postseason-game-card ${game?.result ? "played" : "unplayed"}`}>
-                          <div className="postseason-card-title">
-                            <span>{playInKindLabel(row.kind)}</span>
-                            <strong>{game ? formatIsoDate(game.date) : "TBD"}</strong>
-                          </div>
-                          <div className="postseason-team-stack">
-                            {renderPostseasonTeam(row.awayTeamId, row.awaySeed, undefined, game)}
-                            {renderPostseasonTeam(row.homeTeamId, row.homeSeed, undefined, game)}
-                          </div>
-                          <div className="postseason-card-footer">
-                            <span>{winnerTeamId ? `${teamLabel(teamNames, winnerTeamId)} advances` : "Unplayed"}</span>
-                            {renderGameActions(game)}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </section>
-              ))}
-            </div>
-          </section>
-
-          <section className="postseason-section">
-            <div className="team-card-section-title">
-              <h4>Playoff Bracket</h4>
-              <span>{(playoffs.series.length || 0).toLocaleString()} series</span>
-            </div>
-            {seriesRounds.length ? (
-              <div className="postseason-round-grid">
-                {seriesRounds.map((round) => {
-                  const roundSeries = (playoffs.series ?? []).filter((series) => series.round === round).sort((a, b) => a.conference.localeCompare(b.conference) || a.bracketIndex - b.bracketIndex);
-                  return (
-                    <section key={round} className="postseason-round">
-                      <h5>{roundSeries[0]?.roundName ?? `Round ${round}`}</h5>
-                      <div className="postseason-series-stack">
-                        {roundSeries.map((series) => {
-                          const state = playoffSeriesState(league, series);
-                          const nextSeriesGame = state.nextGame ? scheduledById.get(state.nextGame.id) : undefined;
-                          const completedGames = state.completedGames.map((game) => scheduledById.get(game.id) ?? game);
-                          return (
-                            <PostseasonSeriesCard
-                              key={series.id}
-                              series={series}
-                              state={state}
-                              completedGames={completedGames}
-                              nextGame={nextSeriesGame}
-                              teamNames={teamNames}
-                              sourceTeamsById={sourceTeamsById}
-                              renderTeam={renderPostseasonTeam}
-                              renderGameActions={renderGameActions}
-                            />
-                          );
-                        })}
-                      </div>
-                    </section>
-                  );
-                })}
-              </div>
-            ) : (
-              <p className="empty-state">The first round appears after both 8-seed play-in games are complete.</p>
-            )}
-          </section>
+          {bracketView === "playoffs" && hasPlayoffBracket ? (
+            <PlayoffBracket
+              league={league}
+              playoffs={playoffs}
+              scheduledById={scheduledById}
+              teamNames={teamNames}
+              sourceTeamsById={sourceTeamsById}
+              onSelectSeries={setSelectedSeriesId}
+            />
+          ) : bracketView === "playoffs" ? (
+            <p className="empty-state">The first round appears after both 8-seed play-in games are complete.</p>
+          ) : (
+            <PlayInBracket
+              groups={playInGroups}
+              scheduledById={scheduledById}
+              teamNames={teamNames}
+              sourceTeamsById={sourceTeamsById}
+              renderGameActions={renderGameActions}
+              onOpenGame={onOpenGame}
+            />
+          )}
+          {selectedSeries && selectedSeriesState && (
+            <PostseasonSeriesModal
+              series={selectedSeries}
+              state={selectedSeriesState}
+              games={selectedSeriesGames}
+              nextGame={selectedSeriesState.nextGame ? scheduledById.get(selectedSeriesState.nextGame.id) : undefined}
+              teamNames={teamNames}
+              renderTeam={renderPostseasonTeam}
+              renderGameActions={renderGameActions}
+              onOpenGame={openGameFromModal}
+              onClose={() => setSelectedSeriesId(null)}
+            />
+          )}
         </>
       )}
     </article>
+  );
+}
+
+function playoffRoundDisplayName(round: number): string {
+  if (round === 1) return "First Round";
+  if (round === 2) return "Conference Semifinals";
+  if (round === 3) return "Conference Finals";
+  if (round === 4) return "Finals";
+  return `Round ${round}`;
+}
+
+function conferenceLabelsForPlayoffs(playoffs: NonNullable<LeagueState["playoffs"]>): string[] {
+  const seedLabels = groupedRows(playoffs.playoffSeeds ?? playoffs.seeds, (seed) => seed.conference, standingsConferenceOrder)
+    .map((group) => group.label)
+    .filter((label) => label !== "Other" && label !== "Finals");
+  const seriesLabels = groupedRows(
+    playoffs.series.filter((series) => series.round < 4),
+    (series) => series.conference,
+    standingsConferenceOrder
+  )
+    .map((group) => group.label)
+    .filter((label) => label !== "Other" && label !== "Finals");
+  return Array.from(new Set([...seedLabels, ...seriesLabels])).slice(0, 2);
+}
+
+function PlayoffBracket({
+  league,
+  playoffs,
+  scheduledById,
+  teamNames,
+  sourceTeamsById,
+  onSelectSeries
+}: {
+  league: LeagueState;
+  playoffs: NonNullable<LeagueState["playoffs"]>;
+  scheduledById: Map<string, ScheduledLeagueGame>;
+  teamNames: Map<string, string>;
+  sourceTeamsById: Map<string, SourceTeamCatalogEntry>;
+  onSelectSeries: (seriesId: string) => void;
+}) {
+  const conferences = conferenceLabelsForPlayoffs(playoffs);
+  const leftConference = conferences[0];
+  const rightConference = conferences[1];
+  const finalsSeries = playoffs.series.find((series) => series.round === 4);
+  return (
+    <section className="postseason-section">
+      <div className="team-card-section-title">
+        <h4>Playoff Bracket</h4>
+        <span>{playoffs.series.length.toLocaleString()} series</span>
+      </div>
+      <div className="playoff-bracket-layout">
+        {leftConference && (
+          <ConferenceBracket
+            league={league}
+            conference={leftConference}
+            series={playoffs.series.filter((row) => row.conference === leftConference && row.round < 4)}
+            scheduledById={scheduledById}
+            teamNames={teamNames}
+            sourceTeamsById={sourceTeamsById}
+            onSelectSeries={onSelectSeries}
+            mirror={false}
+          />
+        )}
+        <section className="playoff-finals-column">
+          <h5>Finals</h5>
+          <div className="bracket-series-list slot-count-1">
+            <BracketSeriesCard
+              series={finalsSeries}
+              league={league}
+              scheduledById={scheduledById}
+              teamNames={teamNames}
+              sourceTeamsById={sourceTeamsById}
+              placeholder="Conference winners"
+              onSelectSeries={onSelectSeries}
+            />
+          </div>
+        </section>
+        {rightConference && (
+          <ConferenceBracket
+            league={league}
+            conference={rightConference}
+            series={playoffs.series.filter((row) => row.conference === rightConference && row.round < 4)}
+            scheduledById={scheduledById}
+            teamNames={teamNames}
+            sourceTeamsById={sourceTeamsById}
+            onSelectSeries={onSelectSeries}
+            mirror
+          />
+        )}
+      </div>
+    </section>
+  );
+}
+
+function ConferenceBracket({
+  league,
+  conference,
+  series,
+  scheduledById,
+  teamNames,
+  sourceTeamsById,
+  onSelectSeries,
+  mirror
+}: {
+  league: LeagueState;
+  conference: string;
+  series: LeaguePlayoffSeries[];
+  scheduledById: Map<string, ScheduledLeagueGame>;
+  teamNames: Map<string, string>;
+  sourceTeamsById: Map<string, SourceTeamCatalogEntry>;
+  onSelectSeries: (seriesId: string) => void;
+  mirror: boolean;
+}) {
+  const rounds = mirror ? [3, 2, 1] : [1, 2, 3];
+  return (
+    <section className={`playoff-conference-bracket ${mirror ? "mirror" : ""}`}>
+      <h4>{conference}</h4>
+      <div className="playoff-bracket-grid">
+        {rounds.map((round) => {
+          const slotCount = round === 1 ? 4 : round === 2 ? 2 : 1;
+          const roundSeries = series.filter((row) => row.round === round);
+          return (
+            <section key={round} className="bracket-round">
+              <h5>{playoffRoundDisplayName(round)}</h5>
+              <div className={`bracket-series-list slot-count-${slotCount}`}>
+                {Array.from({ length: slotCount }, (_, bracketIndex) => (
+                  <BracketSeriesCard
+                    key={`${conference}:${round}:${bracketIndex}`}
+                    series={roundSeries.find((row) => row.bracketIndex === bracketIndex)}
+                    league={league}
+                    scheduledById={scheduledById}
+                    teamNames={teamNames}
+                    sourceTeamsById={sourceTeamsById}
+                    placeholder={round === 1 ? "Awaiting play-in" : "Awaiting winners"}
+                    onSelectSeries={onSelectSeries}
+                  />
+                ))}
+              </div>
+            </section>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function BracketSeriesCard({
+  series,
+  league,
+  scheduledById,
+  teamNames,
+  sourceTeamsById,
+  placeholder,
+  onSelectSeries
+}: {
+  series?: LeaguePlayoffSeries;
+  league: LeagueState;
+  scheduledById: Map<string, ScheduledLeagueGame>;
+  teamNames: Map<string, string>;
+  sourceTeamsById: Map<string, SourceTeamCatalogEntry>;
+  placeholder: string;
+  onSelectSeries: (seriesId: string) => void;
+}) {
+  if (!series) {
+    return (
+      <div className="bracket-series-card placeholder">
+        <span>{placeholder}</span>
+      </div>
+    );
+  }
+
+  const state = playoffSeriesState(league, series);
+  const nextGame = state.nextGame ? scheduledById.get(state.nextGame.id) : undefined;
+  const status = state.winnerTeamId ? `${teamLabel(teamNames, state.winnerTeamId)} advances` : nextGame ? `Next: Game ${nextGame.playoffGameNumber}` : "Series pending";
+  return (
+    <button type="button" className={`bracket-series-card ${state.winnerTeamId ? "complete" : ""}`} onClick={() => onSelectSeries(series.id)}>
+      <span className="bracket-series-meta">
+        <span>{series.roundName}</span>
+        <strong>{state.winsA}-{state.winsB}</strong>
+      </span>
+      <span className="bracket-team-stack">
+        <BracketTeamLine teamId={series.teamAId} seed={series.seedA} wins={state.winsA} winner={state.winnerTeamId === series.teamAId} teamNames={teamNames} sourceTeamsById={sourceTeamsById} />
+        <BracketTeamLine teamId={series.teamBId} seed={series.seedB} wins={state.winsB} winner={state.winnerTeamId === series.teamBId} teamNames={teamNames} sourceTeamsById={sourceTeamsById} />
+      </span>
+      <small>{status}</small>
+    </button>
+  );
+}
+
+function BracketTeamLine({
+  teamId,
+  seed,
+  wins,
+  score,
+  winner,
+  teamNames,
+  sourceTeamsById
+}: {
+  teamId: string;
+  seed?: number;
+  wins?: number;
+  score?: number;
+  winner?: boolean;
+  teamNames: Map<string, string>;
+  sourceTeamsById: Map<string, SourceTeamCatalogEntry>;
+}) {
+  const team = sourceTeamsById.get(teamId);
+  const displayValue = score ?? wins;
+  return (
+    <span className={`bracket-team-line ${winner ? "winner" : ""}`}>
+      <span className="bracket-seed">{seed ?? "-"}</span>
+      {team ? <TeamLogo team={team} className="team-logo-mini" /> : <span className="standings-logo-placeholder" aria-hidden="true" />}
+      <strong>{teamLabel(teamNames, teamId)}</strong>
+      <b>{displayValue ?? "-"}</b>
+    </span>
+  );
+}
+
+function PlayInBracket({
+  groups,
+  scheduledById,
+  teamNames,
+  sourceTeamsById,
+  renderGameActions,
+  onOpenGame
+}: {
+  groups: Array<{ label: string; rows: NonNullable<LeagueState["playoffs"]>["playInGames"] }>;
+  scheduledById: Map<string, ScheduledLeagueGame>;
+  teamNames: Map<string, string>;
+  sourceTeamsById: Map<string, SourceTeamCatalogEntry>;
+  renderGameActions: (game: ScheduledLeagueGame | undefined) => React.ReactNode;
+  onOpenGame: (game: ScheduledLeagueGame) => void;
+}) {
+  return (
+    <section className="postseason-section">
+      <div className="team-card-section-title">
+        <h4>Play-In Tournament</h4>
+        <span>{groups.reduce((sum, group) => sum + group.rows.length, 0).toLocaleString()} games</span>
+      </div>
+      <div className="playin-bracket-grid">
+        {groups.map((group) => {
+          const sevenEight = group.rows.find((row) => row.kind === "seven-eight");
+          const nineTen = group.rows.find((row) => row.kind === "nine-ten");
+          const eightSeed = group.rows.find((row) => row.kind === "eight-seed");
+          return (
+            <section key={group.label} className="playin-conference-bracket">
+              <h5>{group.label}</h5>
+              <div className="playin-bracket-lane">
+                <div className="playin-opening-stack">
+                  <PlayInGameCard row={sevenEight} scheduledById={scheduledById} teamNames={teamNames} sourceTeamsById={sourceTeamsById} renderGameActions={renderGameActions} onOpenGame={onOpenGame} />
+                  <PlayInGameCard row={nineTen} scheduledById={scheduledById} teamNames={teamNames} sourceTeamsById={sourceTeamsById} renderGameActions={renderGameActions} onOpenGame={onOpenGame} />
+                </div>
+                <div className="playin-connector" aria-hidden="true" />
+                <PlayInGameCard row={eightSeed} scheduledById={scheduledById} teamNames={teamNames} sourceTeamsById={sourceTeamsById} renderGameActions={renderGameActions} onOpenGame={onOpenGame} finalSlot />
+              </div>
+            </section>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function PlayInGameCard({
+  row,
+  scheduledById,
+  teamNames,
+  sourceTeamsById,
+  renderGameActions,
+  onOpenGame,
+  finalSlot = false
+}: {
+  row?: NonNullable<LeagueState["playoffs"]>["playInGames"][number];
+  scheduledById: Map<string, ScheduledLeagueGame>;
+  teamNames: Map<string, string>;
+  sourceTeamsById: Map<string, SourceTeamCatalogEntry>;
+  renderGameActions: (game: ScheduledLeagueGame | undefined) => React.ReactNode;
+  onOpenGame: (game: ScheduledLeagueGame) => void;
+  finalSlot?: boolean;
+}) {
+  if (!row) {
+    return (
+      <div className={`playin-game-card placeholder ${finalSlot ? "final-slot" : ""}`}>
+        <span>{finalSlot ? "8 Seed Game" : "Awaiting matchup"}</span>
+      </div>
+    );
+  }
+  const game = scheduledById.get(row.gameId);
+  const winnerTeamId = game?.result?.winnerTeamId && game.result.winnerTeamId !== "tie" ? game.result.winnerTeamId : undefined;
+  return (
+    <div className={`playin-game-card ${game?.result ? "played" : "unplayed"} ${finalSlot ? "final-slot" : ""}`}>
+      <div className="postseason-card-title">
+        <span>{playInKindLabel(row.kind)}</span>
+        <strong>{game ? formatIsoDate(game.date) : "TBD"}</strong>
+      </div>
+      <span className="bracket-team-stack">
+        <BracketTeamLine teamId={row.awayTeamId} seed={row.awaySeed} score={game ? teamGameScore(game, row.awayTeamId) : undefined} winner={winnerTeamId === row.awayTeamId} teamNames={teamNames} sourceTeamsById={sourceTeamsById} />
+        <BracketTeamLine teamId={row.homeTeamId} seed={row.homeSeed} score={game ? teamGameScore(game, row.homeTeamId) : undefined} winner={winnerTeamId === row.homeTeamId} teamNames={teamNames} sourceTeamsById={sourceTeamsById} />
+      </span>
+      <div className="postseason-card-footer">
+        <span>{winnerTeamId ? `${teamLabel(teamNames, winnerTeamId)} advances` : "Unplayed"}</span>
+        <div className="postseason-game-actions">
+          {game && (
+            <Button icon={<FileText size={14} />} onClick={() => onOpenGame(game)}>
+              {game.result ? "Box Score" : "Details"}
+            </Button>
+          )}
+          {renderGameActions(game)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PostseasonSeriesModal({
+  series,
+  state,
+  games,
+  nextGame,
+  teamNames,
+  renderTeam,
+  renderGameActions,
+  onOpenGame,
+  onClose
+}: {
+  series: LeaguePlayoffSeries;
+  state: ReturnType<typeof playoffSeriesState>;
+  games: ScheduledLeagueGame[];
+  nextGame?: ScheduledLeagueGame;
+  teamNames: Map<string, string>;
+  renderTeam: (teamId: string, seed?: number, wins?: number, game?: ScheduledLeagueGame) => React.ReactNode;
+  renderGameActions: (game: ScheduledLeagueGame | undefined) => React.ReactNode;
+  onOpenGame: (game: ScheduledLeagueGame) => void;
+  onClose: () => void;
+}) {
+  const winnerLabel = state.winnerTeamId ? `${teamLabel(teamNames, state.winnerTeamId)} wins series` : nextGame ? `Game ${nextGame.playoffGameNumber}` : "Awaiting result";
+  return (
+    <div className="modal-backdrop" onMouseDown={onClose}>
+      <article className="panel postseason-series-modal" role="dialog" aria-modal="true" aria-labelledby="postseason-series-title" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="panel-title">
+          <div>
+            <h3 id="postseason-series-title">{series.conference} {series.roundName}</h3>
+            <p>{winnerLabel}</p>
+          </div>
+          <Button onClick={onClose}>Close</Button>
+        </div>
+        <div className="series-modal-scoreboard">
+          {renderTeam(series.teamAId, series.seedA, state.winsA)}
+          {renderTeam(series.teamBId, series.seedB, state.winsB)}
+        </div>
+        <div className="series-modal-games">
+          {games.map((game) => {
+            const played = Boolean(game.result);
+            const playable = !played && nextGame?.id === game.id;
+            return (
+              <section key={game.id} className={`series-modal-game ${played ? "played" : playable ? "next" : "pending"}`}>
+                <div className="series-modal-game-header">
+                  <span>Game {game.playoffGameNumber ?? "-"}</span>
+                  <strong>{formatIsoDate(game.date)}</strong>
+                  <em>{played ? "Final" : playable ? "Next" : "If necessary"}</em>
+                </div>
+                <div className="series-modal-scoreline">
+                  <span className={game.result?.winnerTeamId === game.awayTeamId ? "winner" : ""}>
+                    {teamLabel(teamNames, game.awayTeamId)}
+                    <b>{game.result?.awayScore ?? "-"}</b>
+                  </span>
+                  <span className={game.result?.winnerTeamId === game.homeTeamId ? "winner" : ""}>
+                    {teamLabel(teamNames, game.homeTeamId)}
+                    <b>{game.result?.homeScore ?? "-"}</b>
+                  </span>
+                </div>
+                <div className="series-modal-game-actions">
+                  <Button icon={<FileText size={14} />} onClick={() => onOpenGame(game)}>
+                    {played ? "Box Score" : "Details"}
+                  </Button>
+                  {(played || playable) && renderGameActions(game)}
+                </div>
+              </section>
+            );
+          })}
+        </div>
+      </article>
+    </div>
   );
 }
 
@@ -4999,67 +5463,6 @@ function playInKindLabel(kind: "seven-eight" | "nine-ten" | "eight-seed"): strin
   if (kind === "seven-eight") return "7/8 Game";
   if (kind === "nine-ten") return "9/10 Game";
   return "8 Seed Game";
-}
-
-function PostseasonSeriesCard({
-  series,
-  state,
-  completedGames,
-  nextGame,
-  teamNames,
-  sourceTeamsById,
-  renderTeam,
-  renderGameActions
-}: {
-  series: LeaguePlayoffSeries;
-  state: ReturnType<typeof playoffSeriesState>;
-  completedGames: LeagueGame[];
-  nextGame?: ScheduledLeagueGame;
-  teamNames: Map<string, string>;
-  sourceTeamsById: Map<string, SourceTeamCatalogEntry>;
-  renderTeam: (teamId: string, seed?: number, wins?: number, game?: ScheduledLeagueGame) => React.ReactNode;
-  renderGameActions: (game: ScheduledLeagueGame | undefined) => React.ReactNode;
-}) {
-  const winnerLabel = state.winnerTeamId ? teamLabel(teamNames, state.winnerTeamId) : nextGame ? `Game ${nextGame.playoffGameNumber}` : "Awaiting result";
-  return (
-    <div className={`postseason-series-card ${state.winnerTeamId ? "complete" : ""}`}>
-      <div className="postseason-card-title">
-        <span>{series.conference}</span>
-        <strong>{winnerLabel}</strong>
-      </div>
-      <div className="postseason-team-stack">
-        {renderTeam(series.teamAId, series.seedA, state.winsA)}
-        {renderTeam(series.teamBId, series.seedB, state.winsB)}
-      </div>
-      {completedGames.length > 0 && (
-        <div className="postseason-result-list">
-          {completedGames.map((game) => {
-            const scheduledGame = game as ScheduledLeagueGame;
-            return (
-              <button key={game.id} type="button" className="postseason-result-row" title={leagueGameLabel(game, teamNames)}>
-                <span>G{game.playoffGameNumber}</span>
-                <strong>
-                  {teamLabel(teamNames, game.awayTeamId)} {game.result?.awayScore ?? "-"}-{game.result?.homeScore ?? "-"} {teamLabel(teamNames, game.homeTeamId)}
-                </strong>
-                <small>{scheduledGame.date ? formatIsoDate(scheduledGame.date) : ""}</small>
-              </button>
-            );
-          })}
-        </div>
-      )}
-      <div className="postseason-card-footer">
-        <span>
-          {state.winnerTeamId
-            ? `${teamLabel(teamNames, state.winnerTeamId)} wins series`
-            : nextGame
-              ? `${teamLabel(teamNames, nextGame.awayTeamId)} at ${teamLabel(teamNames, nextGame.homeTeamId)}`
-              : "No active game"}
-        </span>
-        {renderGameActions(nextGame)}
-      </div>
-      {!sourceTeamsById.has(series.teamAId) && !sourceTeamsById.has(series.teamBId) && <span aria-hidden="true" />}
-    </div>
-  );
 }
 
 function LeagueTeamDashboard({
@@ -5460,6 +5863,7 @@ function LeagueGameInfoModal({
   sourceTeamsById,
   loadTeam,
   pending,
+  readOnly = false,
   onClose,
   onWatch,
   onManual,
@@ -5472,6 +5876,7 @@ function LeagueGameInfoModal({
   sourceTeamsById: Map<string, SourceTeamCatalogEntry>;
   loadTeam: (teamId: string) => Promise<DiceTeamCard>;
   pending: boolean;
+  readOnly?: boolean;
   onClose: () => void;
   onWatch: () => void;
   onManual: () => void;
@@ -5594,20 +5999,22 @@ function LeagueGameInfoModal({
           </section>
         )}
 
-        <div className="actions">
-          <Button icon={<Play size={16} />} disabled={pending} onClick={onWatch}>
-            Watch
-          </Button>
-          <Button icon={<Play size={16} />} disabled={pending || game.status !== "unplayed"} onClick={onSim}>
-            Sim
-          </Button>
-          <Button icon={<FileText size={16} />} disabled={pending} onClick={onManual}>
-            Manual
-          </Button>
-          <Button icon={<RotateCcw size={16} />} disabled={pending} onClick={onReset}>
-            Reset
-          </Button>
-        </div>
+        {!readOnly && (
+          <div className="actions">
+            <Button icon={<Play size={16} />} disabled={pending} onClick={onWatch}>
+              Watch
+            </Button>
+            <Button icon={<Play size={16} />} disabled={pending || game.status !== "unplayed"} onClick={onSim}>
+              Sim
+            </Button>
+            <Button icon={<FileText size={16} />} disabled={pending} onClick={onManual}>
+              Manual
+            </Button>
+            <Button icon={<RotateCcw size={16} />} disabled={pending} onClick={onReset}>
+              Reset
+            </Button>
+          </div>
+        )}
       </article>
       {activeTeamCard && <TeamCardModal team={activeTeamCard} onClose={() => setActiveTeamCard(null)} />}
     </div>
