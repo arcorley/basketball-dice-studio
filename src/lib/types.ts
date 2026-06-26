@@ -607,8 +607,60 @@ export interface LeagueGame {
   date?: string;
   round?: number;
   sequence?: number;
+  stage?: LeagueGameStage;
+  playoffRound?: number;
+  playoffSeriesId?: string;
+  playoffGameNumber?: number;
+  playoffSeriesLabel?: string;
   status: "unplayed" | "simulated" | "manual";
   result?: GameResult;
+}
+
+export type LeagueGameStage = "regular" | "play-in" | "playoffs";
+
+export interface LeaguePlayoffSeed {
+  teamId: string;
+  conference: string;
+  seed: number;
+}
+
+export interface LeaguePlayoffSeries {
+  id: string;
+  round: number;
+  roundName: string;
+  conference: string;
+  bracketIndex: number;
+  teamAId: string;
+  teamBId: string;
+  seedA?: number;
+  seedB?: number;
+  homeCourtTeamId: string;
+  sourceSeriesIds?: string[];
+  gameIds: string[];
+  createdAt: string;
+}
+
+export interface LeaguePlayInGame {
+  id: string;
+  conference: string;
+  kind: "seven-eight" | "nine-ten" | "eight-seed";
+  homeTeamId: string;
+  awayTeamId: string;
+  homeSeed?: number;
+  awaySeed?: number;
+  gameId: string;
+  createdAt: string;
+}
+
+export interface LeaguePlayoffsState {
+  format: "nba-play-in-and-playoffs";
+  status: "in-progress" | "complete";
+  seeds: LeaguePlayoffSeed[];
+  playoffSeeds?: LeaguePlayoffSeed[];
+  playInGames: LeaguePlayInGame[];
+  series: LeaguePlayoffSeries[];
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface LeagueState {
@@ -616,6 +668,7 @@ export interface LeagueState {
   name: string;
   teamIds: string[];
   games: LeagueGame[];
+  playoffs?: LeaguePlayoffsState;
   currentDate?: string;
   focusTeamId?: string;
   createdAt: string;

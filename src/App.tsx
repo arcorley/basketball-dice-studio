@@ -27,16 +27,21 @@ import { buildMatchupCard, createManualResult, defaultMatchupOptions, nRange, si
 import {
   aggregatePlayerStats,
   aggregateTeamStats,
+  clearLeaguePlayoffs,
   createSeasonLeague,
   createTournament,
   markUnplayed,
+  nextPlayablePlayoffGame,
+  playoffSeriesState,
   renameLeague,
   setLeagueCurrentDate,
   setLeagueFocusTeam,
   setManualLeagueResult,
   setSimulatedLeagueResult,
   simulateLeagueGameWithTeams,
-  standings
+  startLeaguePlayoffs,
+  standings,
+  syncLeaguePlayoffs
 } from "./lib/league";
 import { exportGameCardPdf, exportGamePacketPdf, exportPossessionFlowPdf, exportScoresheetsPdf } from "./lib/pdfExport";
 import { formatNumber, formatPct, loadDiceTeam, loadSourceCatalog } from "./lib/sourceData";
@@ -47,6 +52,8 @@ import type {
   DiceTeamCard,
   GameResult,
   LeagueGame,
+  LeaguePlayoffSeed,
+  LeaguePlayoffSeries,
   LeagueState,
   MatchupCard,
   MatchupOptions,
@@ -507,6 +514,23 @@ function conferenceSeedMap(rows: StandingRow[], sourceTeamsById: Map<string, Sou
   return seedMap;
 }
 
+function playoffSeedsForLeague(league: LeagueState, sourceTeamsById: Map<string, SourceTeamCatalogEntry>): LeaguePlayoffSeed[] {
+  const rows = standings(league);
+  return groupedStandingsRows(
+    rows,
+    (row) => standingsAlignmentForTeam(sourceTeamsById.get(row.teamId)).conference,
+    standingsConferenceOrder
+  )
+    .filter((group) => group.label !== "Other")
+    .flatMap((group) =>
+      group.rows.slice(0, 10).map((row, index) => ({
+        teamId: row.teamId,
+        conference: group.label,
+        seed: index + 1
+      }))
+    );
+}
+
 function seasonRoster(teams: SourceTeamCatalogEntry[], season: string): SourceTeamCatalogEntry[] {
   return teams
     .filter((team) => team.season === season)
@@ -596,6 +620,18 @@ function scheduleLeagueGames(league: Pick<LeagueState, "games"> | null | undefin
       sequence: game.sequence ?? index + 1
     }))
     .sort((a, b) => (a.date ?? "").localeCompare(b.date ?? "") || (a.sequence ?? 0) - (b.sequence ?? 0));
+}
+
+function isPostseasonGame(game: Pick<LeagueGame, "stage">): boolean {
+  return game.stage === "play-in" || game.stage === "playoffs";
+}
+
+function isRegularSeasonGame(game: Pick<LeagueGame, "stage">): boolean {
+  return !isPostseasonGame(game);
+}
+
+function leagueGameMatchupOptions(game: Pick<LeagueGame, "stage">): MatchupOptions {
+  return isPostseasonGame(game) ? { venue: "home-court", intensity: "playoff" } : defaultMatchupOptions;
 }
 
 function addMonthsIso(date: string, months: number): string {
@@ -3644,6 +3680,7 @@ function SeasonLeagueView({
   const [renameDraft, setRenameDraft] = useState("");
   const franchises = useMemo(() => franchiseChoicesFor(sourceTeams), [sourceTeams]);
   const sourceTeamsById = useMemo(() => new Map(sourceTeams.map((team) => [team.id, team])), [sourceTeams]);
+  const commitLeague = useCallback((nextLeague: LeagueState) => setLeague(syncLeaguePlayoffs(nextLeague)), [setLeague]);
   const selectedEntries = selected.map((teamId) => sourceTeamsById.get(teamId)).filter((team): team is SourceTeamCatalogEntry => Boolean(team));
   const leagueTeamEntries = (league?.teamIds ?? []).map((teamId) => sourceTeamsById.get(teamId)).filter((team): team is SourceTeamCatalogEntry => Boolean(team));
   const leagueTeamKey = league?.teamIds.join("|") ?? "";
@@ -3652,28 +3689,30 @@ function SeasonLeagueView({
     [replaceFranchise, replaceQuery, replaceSeason, sourceTeams]
   );
   const scheduledGames = useMemo<ScheduledLeagueGame[]>(() => scheduleLeagueGames(league), [league]);
+  const regularScheduledGames = useMemo(() => scheduledGames.filter(isRegularSeasonGame), [scheduledGames]);
+  const postseasonScheduledGames = useMemo(() => scheduledGames.filter(isPostseasonGame), [scheduledGames]);
   const leagueStandingsRows = useMemo(() => (league ? standings(league) : []), [league]);
   const leagueRecordByTeamId = useMemo(
     () => new Map(leagueStandingsRows.map((row) => [row.teamId, standingsRecordLabel(row)])),
     [leagueStandingsRows]
   );
-  const firstScheduleDate = scheduledGames[0]?.date ?? "";
-  const lastScheduleDate = scheduledGames[scheduledGames.length - 1]?.date ?? "";
+  const firstScheduleDate = regularScheduledGames[0]?.date ?? "";
+  const lastScheduleDate = regularScheduledGames[regularScheduledGames.length - 1]?.date ?? "";
   const firstScheduleWeekStart = firstScheduleDate ? startOfCalendarWeekIso(firstScheduleDate) : "";
   const lastScheduleWeekStart = lastScheduleDate ? startOfCalendarWeekIso(lastScheduleDate) : "";
-  const currentLeagueDate = league ? leagueCurrentDate(league, scheduledGames) : "";
+  const currentLeagueDate = league ? leagueCurrentDate(league, regularScheduledGames) : "";
   const currentWeekEnd = currentLeagueDate ? addDaysIso(currentLeagueDate, 6) : "";
   const currentMonthEnd = currentLeagueDate ? addDaysIso(addMonthsIso(currentLeagueDate, 1), -1) : "";
-  const nextLeagueGame = nextUnplayedLeagueGame(scheduledGames, currentLeagueDate);
-  const nextFocusTeamGame = focusTeamId === allTeamsValue ? null : nextUnplayedLeagueGame(scheduledGames, currentLeagueDate, focusTeamId);
-  const currentDateGames = currentLeagueDate ? scheduledGames.filter((game) => game.date === currentLeagueDate) : [];
+  const nextLeagueGame = nextUnplayedLeagueGame(regularScheduledGames, currentLeagueDate);
+  const nextFocusTeamGame = focusTeamId === allTeamsValue ? null : nextUnplayedLeagueGame(regularScheduledGames, currentLeagueDate, focusTeamId);
+  const currentDateGames = currentLeagueDate ? regularScheduledGames.filter((game) => game.date === currentLeagueDate) : [];
   const currentDateFeatureGame = currentDateGames.find((game) => game.status === "unplayed") ?? currentDateGames[0] ?? null;
   const scheduleRangeStart = scheduleWeekStart || (currentLeagueDate ? startOfCalendarWeekIso(currentLeagueDate) : firstScheduleWeekStart);
   const scheduleRangeEnd = scheduleRangeStart ? addDaysIso(scheduleRangeStart, 6) : "";
   const scheduleWeekLabel =
     scheduleRangeStart && scheduleRangeEnd ? `${formatIsoDate(scheduleRangeStart)} through ${formatIsoDate(scheduleRangeEnd)}` : "No scheduled week";
   const scheduleScopeLabel = `${scheduleWeekLabel} · ${scheduleTeamId === allTeamsValue ? "All teams" : teamLabel(teamNames, scheduleTeamId)} · ${leagueStatusFilterLabel(scheduleStatus)}`;
-  const filteredScheduleGames = scheduledGames.filter((game) => {
+  const filteredScheduleGames = regularScheduledGames.filter((game) => {
     if (scheduleTeamId !== allTeamsValue && game.awayTeamId !== scheduleTeamId && game.homeTeamId !== scheduleTeamId) return false;
     if (scheduleStatus === "played" && !game.result) return false;
     if (scheduleStatus !== "all" && scheduleStatus !== "played" && game.status !== scheduleStatus) return false;
@@ -3694,10 +3733,12 @@ function SeasonLeagueView({
     }));
   }, [filteredScheduleGames, scheduleRangeEnd, scheduleRangeStart]);
   const nextScopedUnplayedDate =
-    scheduledGames.find((game) => {
+    regularScheduledGames.find((game) => {
       if (game.status !== "unplayed") return false;
       return scheduleTeamId === allTeamsValue || game.awayTeamId === scheduleTeamId || game.homeTeamId === scheduleTeamId;
     })?.date ?? firstScheduleDate;
+  const regularSeasonComplete = regularScheduledGames.length > 0 && regularScheduledGames.every((game) => game.status !== "unplayed");
+  const postseasonSeeds = useMemo(() => (league ? playoffSeedsForLeague(league, sourceTeamsById) : []), [league, sourceTeamsById]);
   const currentRecord = (teamId: string) => leagueRecordByTeamId.get(teamId) ?? "0-0";
   const matchupRecordLabel = (game: Pick<LeagueGame, "awayTeamId" | "homeTeamId">): string =>
     `${currentRecord(game.awayTeamId)} at ${currentRecord(game.homeTeamId)}`;
@@ -3747,6 +3788,12 @@ function SeasonLeagueView({
   }, [firstScheduleDate, league?.id]);
 
   useEffect(() => {
+    if (!league?.playoffs) return;
+    const syncedLeague = syncLeaguePlayoffs(league);
+    if (syncedLeague !== league) setLeague(syncedLeague);
+  }, [league, setLeague]);
+
+  useEffect(() => {
     setBatchRequest(null);
   }, [scheduleStatus, scheduleTeamId, scheduleWeekStart]);
 
@@ -3780,9 +3827,9 @@ function SeasonLeagueView({
     setLeagueError(null);
     try {
       const [away, home] = await Promise.all([loadTeam(game.awayTeamId), loadTeam(game.homeTeamId)]);
-      const nextLeague = simulateLeagueGameWithTeams(league, game.id, away, home);
+      const nextLeague = simulateLeagueGameWithTeams(league, game.id, away, home, Date.now(), leagueGameMatchupOptions(game));
       const gameDate = scheduledGames.find((scheduledGame) => scheduledGame.id === game.id)?.date;
-      setLeague(gameDate && (!league.currentDate || gameDate > league.currentDate) ? setLeagueCurrentDate(nextLeague, gameDate) : nextLeague);
+      commitLeague(isRegularSeasonGame(game) && gameDate && (!league.currentDate || gameDate > league.currentDate) ? setLeagueCurrentDate(nextLeague, gameDate) : nextLeague);
     } catch (reason) {
       setLeagueError(reason instanceof Error ? reason.message : String(reason));
     } finally {
@@ -3813,7 +3860,7 @@ function SeasonLeagueView({
 
   const unplayedGamesBetween = (startDate: string, endDate: string) => {
     const [start, end] = normalizedDateRange(startDate, endDate);
-    return scheduledGames.filter((game) => game.status === "unplayed" && game.date >= start && game.date <= end);
+    return regularScheduledGames.filter((game) => game.status === "unplayed" && game.date >= start && game.date <= end);
   };
 
   const previewAdvanceThrough = (label: string, throughDate: string, confirmLabel: string) => {
@@ -3862,7 +3909,7 @@ function SeasonLeagueView({
       return;
     }
     const startDate = currentLeagueDate && currentLeagueDate <= nextFocusTeamGame.date ? currentLeagueDate : nextFocusTeamGame.date;
-    const games = scheduledGames.filter((game) => game.status === "unplayed" && game.date >= startDate && game.date < nextFocusTeamGame.date);
+    const games = regularScheduledGames.filter((game) => game.status === "unplayed" && game.date >= startDate && game.date < nextFocusTeamGame.date);
     const stopBeforeLabel = leagueGameLabel(nextFocusTeamGame, teamNames);
     setBatchRequest({
       label: `Stop at ${teamLabel(teamNames, focusTeamId)} next game: ${stopBeforeLabel}`,
@@ -3879,7 +3926,7 @@ function SeasonLeagueView({
   const changeFocusTeam = (teamId: string) => {
     setFocusTeamId(teamId);
     if (!league) return;
-    setLeague(setLeagueFocusTeam(league, teamId === allTeamsValue ? null : teamId));
+    commitLeague(setLeagueFocusTeam(league, teamId === allTeamsValue ? null : teamId));
   };
 
   const previewBatchSimulation = () => {
@@ -3916,14 +3963,14 @@ function SeasonLeagueView({
         const away = cards.get(game.awayTeamId);
         const home = cards.get(game.homeTeamId);
         if (!away || !home) throw new Error(`Missing team card for ${game.awayTeamId} or ${game.homeTeamId}.`);
-        nextLeague = simulateLeagueGameWithTeams(nextLeague, game.id, away, home, seed);
+        nextLeague = simulateLeagueGameWithTeams(nextLeague, game.id, away, home, seed, leagueGameMatchupOptions(game));
         seed += 1;
       }
       if (batchRequest.advanceToDate) {
         nextLeague = setLeagueCurrentDate(nextLeague, batchRequest.advanceToDate);
         setScheduleWeek(batchRequest.advanceToDate);
       }
-      setLeague(nextLeague);
+      commitLeague(nextLeague);
       setBatchRequest(null);
     } catch (reason) {
       setLeagueError(reason instanceof Error ? reason.message : String(reason));
@@ -3947,7 +3994,7 @@ function SeasonLeagueView({
     const nextName = renameDraft.trim();
     if (!nextName) return;
     if (nextName !== targetLeague.name) {
-      setLeague(renameLeague(targetLeague, nextName));
+      commitLeague(renameLeague(targetLeague, nextName));
     }
     cancelLeagueRename();
     setLeagueError(null);
@@ -4296,7 +4343,7 @@ function SeasonLeagueView({
                   </div>
                 )}
                 <p>
-                  {league.teamIds.length.toLocaleString()} teams · {scheduleRangeLabel(scheduledGames)}
+                  {league.teamIds.length.toLocaleString()} teams · {scheduleRangeLabel(regularScheduledGames)}
                 </p>
               </div>
               <div className="league-next-stack">
@@ -4403,7 +4450,30 @@ function SeasonLeagueView({
               <p>{leagueError}</p>
             </article>
           )}
-          {section === "schedule" && (
+          {section === "schedule" && (regularSeasonComplete || league.playoffs ? (
+            <LeaguePostseasonPanel
+              league={league}
+              seeds={postseasonSeeds}
+              regularSeasonComplete={regularSeasonComplete}
+              postseasonGames={postseasonScheduledGames}
+              teamNames={teamNames}
+              sourceTeamsById={sourceTeamsById}
+              pending={Boolean(pendingGameId)}
+              onStart={() => {
+                try {
+                  commitLeague(startLeaguePlayoffs(league, postseasonSeeds));
+                  setLeagueError(null);
+                } catch (reason) {
+                  setLeagueError(reason instanceof Error ? reason.message : String(reason));
+                }
+              }}
+              onClear={() => commitLeague(clearLeaguePlayoffs(league))}
+              onWatch={(game) => setWatchGame(game)}
+              onManual={(game) => setManualGame(game)}
+              onSim={(game) => void simulateGameInLeague(game)}
+              onReset={(game) => commitLeague(markUnplayed(league, game.id))}
+            />
+          ) : (
             <article className="panel schedule-panel">
               <div className="panel-title">
                 <div>
@@ -4569,7 +4639,7 @@ function SeasonLeagueView({
                                         data-tooltip="Reset to unplayed"
                                         title="Reset to unplayed"
                                         disabled={Boolean(pendingGameId)}
-                                        onClick={() => setLeague(markUnplayed(league, game.id))}
+                                        onClick={() => commitLeague(markUnplayed(league, game.id))}
                                       >
                                         Reset
                                       </Button>
@@ -4589,7 +4659,7 @@ function SeasonLeagueView({
                 <p className="empty-state">No games match this calendar window.</p>
               )}
             </article>
-          )}
+          ))}
           {section === "team" && (
             <LeagueTeamDashboard
               league={league}
@@ -4608,7 +4678,7 @@ function SeasonLeagueView({
             <ManualResultFormLoader
               game={manualGame}
               league={league}
-              setLeague={setLeague}
+              setLeague={commitLeague}
               onClose={() => setManualGame(null)}
               loadTeam={loadTeam}
             />
@@ -4617,7 +4687,7 @@ function SeasonLeagueView({
             <LeagueWatchGameLoader
               game={watchGame}
               league={league}
-              setLeague={setLeague}
+              setLeague={commitLeague}
               onClose={() => setWatchGame(null)}
               loadTeam={loadTeam}
             />
@@ -4645,7 +4715,7 @@ function SeasonLeagueView({
                 void simulateGameInLeague(game);
               }}
               onReset={() => {
-                setLeague(markUnplayed(league, infoGame.id));
+                commitLeague(markUnplayed(league, infoGame.id));
                 setInfoGame(null);
               }}
             />
@@ -4701,6 +4771,295 @@ function SeasonLeagueView({
 
 function statInputKey(team: DiceTeamCard, player: string): string {
   return `${team.id}:${player}`;
+}
+
+function LeaguePostseasonPanel({
+  league,
+  seeds,
+  regularSeasonComplete,
+  postseasonGames,
+  teamNames,
+  sourceTeamsById,
+  pending,
+  onStart,
+  onClear,
+  onWatch,
+  onManual,
+  onSim,
+  onReset
+}: {
+  league: LeagueState;
+  seeds: LeaguePlayoffSeed[];
+  regularSeasonComplete: boolean;
+  postseasonGames: ScheduledLeagueGame[];
+  teamNames: Map<string, string>;
+  sourceTeamsById: Map<string, SourceTeamCatalogEntry>;
+  pending: boolean;
+  onStart: () => void;
+  onClear: () => void;
+  onWatch: (game: ScheduledLeagueGame) => void;
+  onManual: (game: ScheduledLeagueGame) => void;
+  onSim: (game: ScheduledLeagueGame) => void;
+  onReset: (game: ScheduledLeagueGame) => void;
+}) {
+  const playoffs = league.playoffs;
+  const scheduledById = useMemo(() => new Map(postseasonGames.map((game) => [game.id, game])), [postseasonGames]);
+  const nextGame = playoffs ? nextPlayablePlayoffGame(league) : undefined;
+  const nextScheduledGame = nextGame ? scheduledById.get(nextGame.id) : undefined;
+  const seedCountByConference = groupedRows(seeds, (seed) => seed.conference, standingsConferenceOrder);
+  const canStart = regularSeasonComplete && seedCountByConference.filter((group) => group.rows.length >= 10).length >= 2;
+  const championSeries = playoffs?.series.find((series) => series.round === 4);
+  const championTeamId = championSeries ? playoffSeriesState(league, championSeries).winnerTeamId : undefined;
+  const playInGroups = groupedRows(playoffs?.playInGames ?? [], (game) => game.conference, standingsConferenceOrder);
+  const seriesRounds = Array.from(new Set((playoffs?.series ?? []).map((series) => series.round))).sort((a, b) => a - b);
+
+  const renderGameActions = (game: ScheduledLeagueGame | undefined) => {
+    if (!game) return null;
+    const played = Boolean(game.result);
+    return (
+      <div className="postseason-game-actions">
+        <Button icon={<Play size={14} />} disabled={pending} onClick={() => onWatch(game)}>
+          Watch
+        </Button>
+        {!played && (
+          <Button icon={<SkipForward size={14} />} disabled={pending} onClick={() => onSim(game)}>
+            Sim
+          </Button>
+        )}
+        <Button icon={<FileText size={14} />} disabled={pending} onClick={() => onManual(game)}>
+          Manual
+        </Button>
+        {played && (
+          <Button icon={<RotateCcw size={14} />} disabled={pending} onClick={() => onReset(game)}>
+            Reset
+          </Button>
+        )}
+      </div>
+    );
+  };
+
+  const renderPostseasonTeam = (teamId: string, seed?: number, wins?: number, game?: ScheduledLeagueGame) => {
+    const team = sourceTeamsById.get(teamId);
+    const score = game ? teamGameScore(game, teamId) : undefined;
+    const wonGame = game?.result?.winnerTeamId === teamId;
+    return (
+      <span className={`postseason-team-row ${wonGame ? "winner" : ""}`}>
+        <span className="postseason-seed">{seed ? seed : "-"}</span>
+        <TeamIdentityButton team={team} teamId={teamId} teamNames={teamNames} className="standings-team compact-team-identity" />
+        {wins !== undefined && <strong className="postseason-wins">{wins}</strong>}
+        {score !== undefined && <strong className="postseason-score">{score}</strong>}
+      </span>
+    );
+  };
+
+  return (
+    <article className="panel postseason-panel">
+      <div className="panel-title">
+        <div>
+          <h3>Postseason</h3>
+          <p>
+            {playoffs
+              ? championTeamId
+                ? `${teamLabel(teamNames, championTeamId)} champion`
+                : nextScheduledGame
+                  ? `Next: ${leagueGameLabel(nextScheduledGame, teamNames)}`
+                  : "Waiting for the next postseason matchup"
+              : regularSeasonComplete
+                ? "Play-in tournament ready"
+                : "Regular season in progress"}
+          </p>
+        </div>
+        <div className="postseason-header-actions">
+          {!playoffs ? (
+            <Button icon={<Trophy size={16} />} variant="primary" disabled={!canStart || pending} onClick={onStart}>
+              Start Play-In
+            </Button>
+          ) : (
+            <>
+              {nextScheduledGame && (
+                <Button icon={<SkipForward size={16} />} variant="primary" disabled={pending} onClick={() => onSim(nextScheduledGame)}>
+                  Sim Next
+                </Button>
+              )}
+              <Button icon={<RotateCcw size={16} />} variant="danger" disabled={pending} onClick={onClear}>
+                Reset Postseason
+              </Button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {!playoffs ? (
+        <div className="postseason-start-grid">
+          {seedCountByConference.map((group) => (
+            <section key={group.label} className="postseason-seed-card">
+              <h4>{group.label}</h4>
+              <div className="postseason-seed-list">
+                {group.rows.slice(0, 10).map((seed) => (
+                  <span key={seed.teamId}>
+                    <strong>{seed.seed}</strong>
+                    <TeamIdentityButton team={sourceTeamsById.get(seed.teamId)} teamId={seed.teamId} teamNames={teamNames} className="standings-team compact-team-identity" />
+                  </span>
+                ))}
+              </div>
+            </section>
+          ))}
+          {!canStart && (
+            <div className="empty-state postseason-start-note">
+              <strong>{regularSeasonComplete ? "Need two 10-team conferences" : "Finish the regular season"}</strong>
+              <p>{regularSeasonComplete ? "Play-in seeding uses conference seeds 7 through 10." : "The play-in unlocks after all regular-season games have results."}</p>
+            </div>
+          )}
+        </div>
+      ) : (
+        <>
+          <section className="postseason-section">
+            <div className="team-card-section-title">
+              <h4>Play-In Tournament</h4>
+              <span>{postseasonGames.filter((game) => game.stage === "play-in").length.toLocaleString()} games</span>
+            </div>
+            <div className="postseason-playin-grid">
+              {playInGroups.map((group) => (
+                <section key={group.label} className="postseason-conference">
+                  <h5>{group.label}</h5>
+                  <div className="postseason-game-stack">
+                    {group.rows.map((row) => {
+                      const game = scheduledById.get(row.gameId);
+                      const winnerTeamId = game?.result?.winnerTeamId && game.result.winnerTeamId !== "tie" ? game.result.winnerTeamId : undefined;
+                      return (
+                        <div key={row.id} className={`postseason-game-card ${game?.result ? "played" : "unplayed"}`}>
+                          <div className="postseason-card-title">
+                            <span>{playInKindLabel(row.kind)}</span>
+                            <strong>{game ? formatIsoDate(game.date) : "TBD"}</strong>
+                          </div>
+                          <div className="postseason-team-stack">
+                            {renderPostseasonTeam(row.awayTeamId, row.awaySeed, undefined, game)}
+                            {renderPostseasonTeam(row.homeTeamId, row.homeSeed, undefined, game)}
+                          </div>
+                          <div className="postseason-card-footer">
+                            <span>{winnerTeamId ? `${teamLabel(teamNames, winnerTeamId)} advances` : "Unplayed"}</span>
+                            {renderGameActions(game)}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </section>
+              ))}
+            </div>
+          </section>
+
+          <section className="postseason-section">
+            <div className="team-card-section-title">
+              <h4>Playoff Bracket</h4>
+              <span>{(playoffs.series.length || 0).toLocaleString()} series</span>
+            </div>
+            {seriesRounds.length ? (
+              <div className="postseason-round-grid">
+                {seriesRounds.map((round) => {
+                  const roundSeries = (playoffs.series ?? []).filter((series) => series.round === round).sort((a, b) => a.conference.localeCompare(b.conference) || a.bracketIndex - b.bracketIndex);
+                  return (
+                    <section key={round} className="postseason-round">
+                      <h5>{roundSeries[0]?.roundName ?? `Round ${round}`}</h5>
+                      <div className="postseason-series-stack">
+                        {roundSeries.map((series) => {
+                          const state = playoffSeriesState(league, series);
+                          const nextSeriesGame = state.nextGame ? scheduledById.get(state.nextGame.id) : undefined;
+                          const completedGames = state.completedGames.map((game) => scheduledById.get(game.id) ?? game);
+                          return (
+                            <PostseasonSeriesCard
+                              key={series.id}
+                              series={series}
+                              state={state}
+                              completedGames={completedGames}
+                              nextGame={nextSeriesGame}
+                              teamNames={teamNames}
+                              sourceTeamsById={sourceTeamsById}
+                              renderTeam={renderPostseasonTeam}
+                              renderGameActions={renderGameActions}
+                            />
+                          );
+                        })}
+                      </div>
+                    </section>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="empty-state">The first round appears after both 8-seed play-in games are complete.</p>
+            )}
+          </section>
+        </>
+      )}
+    </article>
+  );
+}
+
+function playInKindLabel(kind: "seven-eight" | "nine-ten" | "eight-seed"): string {
+  if (kind === "seven-eight") return "7/8 Game";
+  if (kind === "nine-ten") return "9/10 Game";
+  return "8 Seed Game";
+}
+
+function PostseasonSeriesCard({
+  series,
+  state,
+  completedGames,
+  nextGame,
+  teamNames,
+  sourceTeamsById,
+  renderTeam,
+  renderGameActions
+}: {
+  series: LeaguePlayoffSeries;
+  state: ReturnType<typeof playoffSeriesState>;
+  completedGames: LeagueGame[];
+  nextGame?: ScheduledLeagueGame;
+  teamNames: Map<string, string>;
+  sourceTeamsById: Map<string, SourceTeamCatalogEntry>;
+  renderTeam: (teamId: string, seed?: number, wins?: number, game?: ScheduledLeagueGame) => React.ReactNode;
+  renderGameActions: (game: ScheduledLeagueGame | undefined) => React.ReactNode;
+}) {
+  const winnerLabel = state.winnerTeamId ? teamLabel(teamNames, state.winnerTeamId) : nextGame ? `Game ${nextGame.playoffGameNumber}` : "Awaiting result";
+  return (
+    <div className={`postseason-series-card ${state.winnerTeamId ? "complete" : ""}`}>
+      <div className="postseason-card-title">
+        <span>{series.conference}</span>
+        <strong>{winnerLabel}</strong>
+      </div>
+      <div className="postseason-team-stack">
+        {renderTeam(series.teamAId, series.seedA, state.winsA)}
+        {renderTeam(series.teamBId, series.seedB, state.winsB)}
+      </div>
+      {completedGames.length > 0 && (
+        <div className="postseason-result-list">
+          {completedGames.map((game) => {
+            const scheduledGame = game as ScheduledLeagueGame;
+            return (
+              <button key={game.id} type="button" className="postseason-result-row" title={leagueGameLabel(game, teamNames)}>
+                <span>G{game.playoffGameNumber}</span>
+                <strong>
+                  {teamLabel(teamNames, game.awayTeamId)} {game.result?.awayScore ?? "-"}-{game.result?.homeScore ?? "-"} {teamLabel(teamNames, game.homeTeamId)}
+                </strong>
+                <small>{scheduledGame.date ? formatIsoDate(scheduledGame.date) : ""}</small>
+              </button>
+            );
+          })}
+        </div>
+      )}
+      <div className="postseason-card-footer">
+        <span>
+          {state.winnerTeamId
+            ? `${teamLabel(teamNames, state.winnerTeamId)} wins series`
+            : nextGame
+              ? `${teamLabel(teamNames, nextGame.awayTeamId)} at ${teamLabel(teamNames, nextGame.homeTeamId)}`
+              : "No active game"}
+        </span>
+        {renderGameActions(nextGame)}
+      </div>
+      {!sourceTeamsById.has(series.teamAId) && !sourceTeamsById.has(series.teamBId) && <span aria-hidden="true" />}
+    </div>
+  );
 }
 
 function LeagueTeamDashboard({
@@ -5272,6 +5631,7 @@ function LeagueWatchGameLoader({
   const [error, setError] = useState<string | null>(null);
   const leagueRows = useMemo(() => new Map(standings(league).map((row) => [row.teamId, row])), [league]);
   const leagueRecord = (teamId: string) => standingsRecordLabel(leagueRows.get(teamId));
+  const matchupOptions = leagueGameMatchupOptions(game);
 
   useEffect(() => {
     let active = true;
@@ -5308,8 +5668,8 @@ function LeagueWatchGameLoader({
         {!error && !teams && <p className="empty-state">Loading scheduled game teams.</p>}
         {teams && (
           <PlayableMatchup
-            matchup={buildMatchupCard(teams.away, teams.home, defaultMatchupOptions)}
-            matchupOptions={defaultMatchupOptions}
+            matchup={buildMatchupCard(teams.away, teams.home, matchupOptions)}
+            matchupOptions={matchupOptions}
             title="Watch Game"
             compact
             onSaveResult={(result) => setLeague(setSimulatedLeagueResult(league, game.id, result))}
@@ -5407,6 +5767,7 @@ function ManualResultForm({
   const [activePlayerCard, setActivePlayerCard] = useState<{ team: DiceTeamCard; player: DicePlayerCard } | null>(null);
   const leagueRows = useMemo(() => new Map(standings(league).map((row) => [row.teamId, row])), [league]);
   const leagueRecord = (teamId: string) => standingsRecordLabel(leagueRows.get(teamId));
+  const matchupOptions = leagueGameMatchupOptions(game);
 
   const update = (team: DiceTeamCard, player: string, field: string, value: number) => {
     const key = statInputKey(team, player);
@@ -5452,7 +5813,7 @@ function ManualResultForm({
     setManualError(null);
     let result: GameResult;
     try {
-      result = createManualResult(away, home, awayScore, homeScore);
+      result = createManualResult(away, home, awayScore, homeScore, matchupOptions);
     } catch (reason) {
       setManualError(reason instanceof Error ? reason.message : String(reason));
       return;
