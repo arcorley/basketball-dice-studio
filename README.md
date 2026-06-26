@@ -61,8 +61,8 @@ The app is source-first with SQLite as the canonical local store:
   fouls, usage rolls, turnover/foul/shot action ranges, shot type rolls,
   make rolls, assists, blocks, rebounds, offensive-rebound extensions, and
   stat assignment tables.
-- Matchup scoresheets can be exported directly to a two-page landscape PDF for
-  printing.
+- Matchup scoresheets can be exported directly to an official-style landscape
+  PDF for printing.
 
 ## Setup
 

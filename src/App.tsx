@@ -1570,7 +1570,7 @@ function MatchupStudio({
             Export Flow PDF
           </Button>
           <Button data-testid="export-scoresheets-pdf" icon={<Download size={16} />} onClick={() => void exportScoresheetsPdf(matchup)}>
-            Export Scoresheets PDF
+            Export Scoresheet PDF
           </Button>
         </div>
       </header>
