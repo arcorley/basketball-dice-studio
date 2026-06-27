@@ -78,7 +78,13 @@ import {
   type TeamPostgameGrade,
   type TeamRestPressure
 } from "./lib/leagueGameSystems";
-import { buildCoachProgressionSummary, buildFranchiseContinuitySnapshot, buildRosterBuildingBoards, recommendSeasonCarryover } from "./lib/franchiseMode";
+import {
+  buildCoachProgressionSummary,
+  buildFranchiseContinuitySnapshot,
+  buildRosterBuildingBoards,
+  recommendSeasonCarryover,
+  type SeasonLeagueSetupRecommendation
+} from "./lib/franchiseMode";
 import { exportGameCardPdf, exportGamePacketPdf, exportPossessionFlowPdf, exportScoresheetsPdf } from "./lib/pdfExport";
 import { formatNumber, formatPct, loadDiceTeam, loadSourceCatalog } from "./lib/sourceData";
 import { generalDerivationNotes, teamDerivationNotes } from "./lib/teamCards";
@@ -4890,6 +4896,34 @@ function SeasonLeagueView({
     cancelLeagueRename();
   };
 
+  const createCarryoverLeague = (setup: SeasonLeagueSetupRecommendation) => {
+    const teamIds = setup.teamIds.filter((teamId, index) => setup.teamIds.indexOf(teamId) === index && sourceTeamsById.has(teamId));
+    if (teamIds.length < 2) {
+      setLeagueError("Next season needs at least two available teams.");
+      return;
+    }
+    if (!Number.isFinite(setup.gamesPerTeam) || setup.gamesPerTeam <= 0) {
+      setLeagueError("Next season needs a positive games-per-team target.");
+      return;
+    }
+
+    const fallbackFocusTeamId = setup.focusTeamId && teamIds.includes(setup.focusTeamId) ? setup.focusTeamId : teamIds[0];
+    const nextLeague = createSeasonLeague(setup.name.trim() || "Next Season", teamIds, setup.gamesPerTeam, setup.seasonStartDate);
+    setLeague({
+      ...nextLeague,
+      focusTeamId: fallbackFocusTeamId,
+      matchupOptions: setup.matchupOptions ?? nextLeague.matchupOptions
+    });
+    setMode("play");
+    setSection("hq");
+    setLeagueError(null);
+    setBatchRequest(null);
+    setManualGame(null);
+    setWatchGame(null);
+    setInfoGame(null);
+    cancelLeagueRename();
+  };
+
   const deleteCurrentLeague = () => {
     if (!league) return;
     deleteLeague(league.id);
@@ -5619,6 +5653,7 @@ function SeasonLeagueView({
               onTeamChange={changeFocusTeam}
               onApplyTeamPlan={applyTeamCoachPlan}
               onOpenGame={setInfoGame}
+              onCreateCarryoverLeague={createCarryoverLeague}
             />
           )}
           {manualGame && (
@@ -6013,7 +6048,8 @@ function LeagueGameSystemsView({
   loadTeam,
   onTeamChange,
   onApplyTeamPlan,
-  onOpenGame
+  onOpenGame,
+  onCreateCarryoverLeague
 }: {
   league: LeagueState;
   leagues: LeagueState[];
@@ -6027,6 +6063,7 @@ function LeagueGameSystemsView({
   onTeamChange: (teamId: string) => void;
   onApplyTeamPlan: (teamId: string, plan: TeamGamePlanOptions) => void;
   onOpenGame: (game: ScheduledLeagueGame) => void;
+  onCreateCarryoverLeague: (setup: SeasonLeagueSetupRecommendation) => void;
 }) {
   const scheduledById = useMemo(() => new Map(scheduledGames.map((game) => [game.id, game])), [scheduledGames]);
   const focusedTeamId = focusTeamId !== allTeamsValue && league.teamIds.includes(focusTeamId) ? focusTeamId : league.teamIds[0] ?? "";
@@ -6086,6 +6123,7 @@ function LeagueGameSystemsView({
     () => recommendSeasonCarryover(league, { history: franchiseLeagues, teams: leagueTeamCards, teamNames, focusTeamId: focusedTeamId, maxRosterHooks: 6 }),
     [focusedTeamId, franchiseLeagues, league, leagueTeamCards, teamNames]
   );
+  const carryoverReady = carryover.setup.teamIds.length >= 2 && carryover.setup.gamesPerTeam > 0;
   const rosterBoards = useMemo(
     () =>
       buildRosterBuildingBoards(league, {
@@ -6260,6 +6298,11 @@ function LeagueGameSystemsView({
             <span>Next season setup</span>
             <strong>{carryover.setup.name}</strong>
             <p>{carryover.setup.teamIds.length.toLocaleString()} teams · {carryover.setup.gamesPerTeam.toLocaleString()} games per team · starts {formatIsoDate(carryover.setup.seasonStartDate)}</p>
+            <div className="league-world-chip-row">
+              <span className="league-world-chip">{carryover.retainedTeamIds.length.toLocaleString()} retained</span>
+              <span className="league-world-chip">{carryover.protectedRivalries.length.toLocaleString()} protected rivalries</span>
+              <span className="league-world-chip">{carryover.rosterHooks.length.toLocaleString()} roster hooks</span>
+            </div>
             <div className="franchise-timeline">
               {carryover.notes.slice(0, 3).map((note) => (
                 <span key={note} className="franchise-timeline-row">
@@ -6269,6 +6312,9 @@ function LeagueGameSystemsView({
                 </span>
               ))}
             </div>
+            <Button icon={<Plus size={14} />} variant="primary" disabled={!carryoverReady} onClick={() => onCreateCarryoverLeague(carryover.setup)}>
+              Create Next Season
+            </Button>
           </section>
           <section className="dynasty-card">
             <span>Dynasty table</span>
