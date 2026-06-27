@@ -3849,27 +3849,45 @@ tr:last-child td {
 .league-newspaper-grid,
 .trophy-room-grid,
 .challenge-grid,
-.coach-grade-grid {
+.coach-grade-grid,
+.franchise-continuity-grid,
+.dynasty-grid,
+.roster-building-grid,
+.offseason-grid,
+.coach-progression-grid,
+.scenario-grid,
+.adaptive-ai-grid,
+.media-world-grid,
+.power-rankings-grid {
   display: grid;
   gap: 10px;
   min-width: 0;
 }
 
-.team-identity-grid {
+.team-identity-grid,
+.franchise-continuity-grid,
+.dynasty-grid {
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
 .fatigue-grid,
 .series-adjustment-grid,
-.challenge-grid {
+.challenge-grid,
+.roster-building-grid,
+.offseason-grid,
+.coach-progression-grid,
+.scenario-grid,
+.adaptive-ai-grid {
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
 }
 
-.league-newspaper-grid {
+.league-newspaper-grid,
+.media-world-grid {
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
 }
 
-.trophy-room-grid {
+.trophy-room-grid,
+.power-rankings-grid {
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
 }
 
@@ -4299,6 +4317,495 @@ button.coach-grade-card:focus-visible {
 .coach-grade-card.grade-d,
 .coach-grade-card.grade-f {
   border-top-color: var(--red);
+}
+
+.franchise-continuity-card,
+.dynasty-card,
+.roster-building-card,
+.offseason-card,
+.coach-progression-card,
+.coach-skill-card,
+.scenario-card,
+.adaptive-ai-card,
+.ai-tendency-card,
+.media-world-card,
+.power-ranking-card {
+  border: 1px solid #e1e7e4;
+  border-radius: 8px;
+  background: #ffffff;
+  color: inherit;
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px;
+}
+
+button.franchise-continuity-card,
+button.dynasty-card,
+button.roster-building-card,
+button.offseason-card,
+button.coach-progression-card,
+button.coach-skill-card,
+button.scenario-card,
+button.adaptive-ai-card,
+button.ai-tendency-card,
+button.media-world-card,
+button.power-ranking-card {
+  cursor: pointer;
+  text-align: left;
+}
+
+button.franchise-continuity-card:hover,
+button.franchise-continuity-card:focus-visible,
+button.dynasty-card:hover,
+button.dynasty-card:focus-visible,
+button.roster-building-card:hover,
+button.roster-building-card:focus-visible,
+button.offseason-card:hover,
+button.offseason-card:focus-visible,
+button.coach-progression-card:hover,
+button.coach-progression-card:focus-visible,
+button.coach-skill-card:hover,
+button.coach-skill-card:focus-visible,
+button.scenario-card:hover,
+button.scenario-card:focus-visible,
+button.adaptive-ai-card:hover,
+button.adaptive-ai-card:focus-visible,
+button.ai-tendency-card:hover,
+button.ai-tendency-card:focus-visible,
+button.media-world-card:hover,
+button.media-world-card:focus-visible,
+button.power-ranking-card:hover,
+button.power-ranking-card:focus-visible {
+  border-color: var(--teal);
+  box-shadow: 0 0 0 3px rgba(34, 108, 115, 0.1);
+}
+
+.franchise-continuity-card.active,
+.dynasty-card.active,
+.roster-building-card.active,
+.offseason-card.ready,
+.coach-progression-card.positive,
+.coach-skill-card.unlocked,
+.scenario-card.complete,
+.adaptive-ai-card.positive,
+.ai-tendency-card.positive,
+.media-world-card.featured,
+.power-ranking-card.rising {
+  border-color: #bed6c8;
+  background: #f1f8f4;
+}
+
+.franchise-continuity-card.warning,
+.dynasty-card.warning,
+.roster-building-card.warning,
+.offseason-card.warning,
+.coach-progression-card.warning,
+.coach-skill-card.locked,
+.scenario-card.warning,
+.adaptive-ai-card.warning,
+.ai-tendency-card.warning,
+.media-world-card.breaking,
+.power-ranking-card.watch {
+  border-color: #e9d3b4;
+  background: #fff8ec;
+}
+
+.franchise-continuity-card.negative,
+.dynasty-card.negative,
+.roster-building-card.blocked,
+.offseason-card.blocked,
+.coach-progression-card.negative,
+.scenario-card.failed,
+.adaptive-ai-card.negative,
+.ai-tendency-card.negative,
+.media-world-card.critical,
+.power-ranking-card.falling {
+  border-color: #e6c4c0;
+  background: #fff5f3;
+}
+
+.franchise-continuity-card > span:first-child,
+.dynasty-card > span:first-child,
+.roster-building-card > span:first-child,
+.offseason-card > span:first-child,
+.coach-progression-card > span:first-child,
+.coach-skill-card > span:first-child,
+.scenario-card > span:first-child,
+.adaptive-ai-card > span:first-child,
+.ai-tendency-card > span:first-child,
+.media-world-card > span:first-child,
+.power-ranking-card > span:first-child,
+.league-mode-kicker,
+.league-mode-meter label,
+.league-mode-meter > span:first-child {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.franchise-continuity-card strong,
+.dynasty-card strong,
+.roster-building-card strong,
+.offseason-card strong,
+.coach-progression-card strong,
+.coach-skill-card strong,
+.scenario-card strong,
+.adaptive-ai-card strong,
+.ai-tendency-card strong,
+.media-world-card strong,
+.power-ranking-card strong {
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.franchise-continuity-card small,
+.dynasty-card small,
+.roster-building-card small,
+.offseason-card small,
+.coach-progression-card small,
+.coach-skill-card small,
+.scenario-card small,
+.adaptive-ai-card small,
+.ai-tendency-card small,
+.media-world-card small,
+.power-ranking-card small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.franchise-continuity-card p,
+.dynasty-card p,
+.roster-building-card p,
+.offseason-card p,
+.coach-progression-card p,
+.coach-skill-card p,
+.scenario-card p,
+.adaptive-ai-card p,
+.ai-tendency-card p,
+.media-world-card p,
+.power-ranking-card p {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.franchise-continuity-card header,
+.dynasty-card header,
+.roster-building-card header,
+.offseason-card header,
+.coach-progression-card header,
+.coach-skill-card header,
+.scenario-card header,
+.adaptive-ai-card header,
+.ai-tendency-card header,
+.media-world-card header,
+.power-ranking-card header {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.franchise-continuity-card header > span,
+.dynasty-card header > span,
+.roster-building-card header > span,
+.offseason-card header > span,
+.coach-progression-card header > span,
+.coach-skill-card header > span,
+.scenario-card header > span,
+.adaptive-ai-card header > span,
+.ai-tendency-card header > span,
+.media-world-card header > span,
+.power-ranking-card header > span {
+  border-radius: 999px;
+  background: #edf3ef;
+  color: var(--green-dark);
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 850;
+  padding: 4px 8px;
+  white-space: nowrap;
+}
+
+.franchise-continuity-card > svg,
+.dynasty-card > svg,
+.roster-building-card > svg,
+.offseason-card > svg,
+.coach-progression-card > svg,
+.coach-skill-card > svg,
+.scenario-card > svg,
+.adaptive-ai-card > svg,
+.ai-tendency-card > svg,
+.media-world-card > svg,
+.power-ranking-card > svg {
+  border-radius: 8px;
+  background: #e7f1eb;
+  color: var(--green-dark);
+  padding: 6px;
+}
+
+.dynasty-card,
+.franchise-continuity-card {
+  border-left: 3px solid var(--green);
+}
+
+.roster-building-card,
+.offseason-card {
+  border-left: 3px solid var(--teal);
+}
+
+.coach-progression-card,
+.coach-skill-card {
+  border-top: 3px solid var(--teal);
+}
+
+.scenario-card {
+  border-left: 3px solid var(--amber);
+}
+
+.adaptive-ai-card,
+.ai-tendency-card {
+  border-top: 3px solid #355c7d;
+}
+
+.media-world-card {
+  border-left: 3px solid #715c8c;
+  background: #fbfcfb;
+}
+
+.power-ranking-card {
+  border-top: 3px solid var(--green-dark);
+  align-content: start;
+}
+
+.league-mode-meter {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.league-mode-meter > span:first-child {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.league-mode-meter > span:first-child b {
+  color: var(--green-dark);
+  font-variant-numeric: tabular-nums;
+}
+
+.league-mode-meter-bar,
+.league-mode-progress {
+  height: 7px;
+  border-radius: 999px;
+  background: #e7ece9;
+  overflow: hidden;
+}
+
+.league-mode-meter-fill,
+.league-mode-meter-bar > span,
+.league-mode-progress > span {
+  display: block;
+  width: var(--meter-value, var(--progress, 50%));
+  max-width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--green);
+}
+
+.league-mode-meter.warning .league-mode-meter-fill,
+.league-mode-meter.warning .league-mode-meter-bar > span,
+.league-mode-progress.warning > span {
+  background: var(--amber);
+}
+
+.league-mode-meter.critical .league-mode-meter-fill,
+.league-mode-meter.critical .league-mode-meter-bar > span,
+.league-mode-progress.critical > span {
+  background: var(--red);
+}
+
+.franchise-timeline,
+.dynasty-milestone-list,
+.roster-hook-list,
+.offseason-hook-list,
+.coach-skill-list,
+.scenario-modifier-list,
+.adaptive-ai-tendency-list,
+.media-buzz-list,
+.power-ranking-list {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.franchise-timeline-row,
+.dynasty-milestone-row,
+.roster-hook-row,
+.offseason-hook-row,
+.coach-skill-row,
+.scenario-modifier-row,
+.adaptive-ai-tendency-row,
+.media-buzz-row,
+.power-ranking-row {
+  border: 1px solid #e1e7e4;
+  border-radius: 8px;
+  background: #ffffff;
+  color: inherit;
+  display: grid;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  padding: 8px 10px;
+}
+
+.franchise-timeline-row,
+.dynasty-milestone-row,
+.roster-hook-row,
+.offseason-hook-row,
+.coach-skill-row,
+.scenario-modifier-row,
+.adaptive-ai-tendency-row,
+.media-buzz-row {
+  grid-template-columns: minmax(86px, 0.32fr) minmax(0, 1fr) auto;
+}
+
+.power-ranking-row {
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+}
+
+.franchise-timeline-row strong,
+.dynasty-milestone-row strong,
+.roster-hook-row strong,
+.offseason-hook-row strong,
+.coach-skill-row strong,
+.scenario-modifier-row strong,
+.adaptive-ai-tendency-row strong,
+.media-buzz-row strong,
+.power-ranking-row strong {
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.franchise-timeline-row span,
+.dynasty-milestone-row span,
+.roster-hook-row span,
+.offseason-hook-row span,
+.coach-skill-row span,
+.scenario-modifier-row span,
+.adaptive-ai-tendency-row span,
+.media-buzz-row span,
+.power-ranking-row span {
+  min-width: 0;
+}
+
+.franchise-timeline-row small,
+.dynasty-milestone-row small,
+.roster-hook-row small,
+.offseason-hook-row small,
+.coach-skill-row small,
+.scenario-modifier-row small,
+.adaptive-ai-tendency-row small,
+.media-buzz-row small,
+.power-ranking-row small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.franchise-timeline-row b,
+.dynasty-milestone-row b,
+.roster-hook-row b,
+.offseason-hook-row b,
+.coach-skill-row b,
+.scenario-modifier-row b,
+.adaptive-ai-tendency-row b,
+.media-buzz-row b,
+.power-ranking-row b {
+  color: var(--green-dark);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.franchise-timeline-row.warning b,
+.dynasty-milestone-row.warning b,
+.roster-hook-row.warning b,
+.offseason-hook-row.warning b,
+.coach-skill-row.locked b,
+.scenario-modifier-row.warning b,
+.adaptive-ai-tendency-row.warning b,
+.media-buzz-row.warning b,
+.power-ranking-row.watch b {
+  color: var(--amber);
+}
+
+.franchise-timeline-row.negative b,
+.dynasty-milestone-row.negative b,
+.roster-hook-row.blocked b,
+.offseason-hook-row.blocked b,
+.scenario-modifier-row.failed b,
+.adaptive-ai-tendency-row.negative b,
+.media-buzz-row.critical b,
+.power-ranking-row.falling b {
+  color: var(--red);
+}
+
+.power-ranking-rank,
+.scenario-difficulty,
+.coach-skill-level,
+.ai-adaptation-level {
+  border-radius: 8px;
+  background: #eef2ef;
+  color: var(--green-dark);
+  display: grid;
+  min-width: 30px;
+  min-height: 30px;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  padding: 4px 7px;
+}
+
+.league-world-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.league-world-chip {
+  border: 1px solid #d8e2dd;
+  border-radius: 999px;
+  background: #f8faf8;
+  color: var(--green-dark);
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  min-width: 0;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
 }
 
 .share-report-panel {
@@ -6490,6 +6997,26 @@ button.coach-grade-card:focus-visible {
   .series-adjustment-card header,
   .challenge-card header,
   .coach-grade-card header,
+  .franchise-continuity-card header,
+  .dynasty-card header,
+  .roster-building-card header,
+  .offseason-card header,
+  .coach-progression-card header,
+  .coach-skill-card header,
+  .scenario-card header,
+  .adaptive-ai-card header,
+  .ai-tendency-card header,
+  .media-world-card header,
+  .power-ranking-card header,
+  .franchise-timeline-row,
+  .dynasty-milestone-row,
+  .roster-hook-row,
+  .offseason-hook-row,
+  .coach-skill-row,
+  .scenario-modifier-row,
+  .adaptive-ai-tendency-row,
+  .media-buzz-row,
+  .power-ranking-row,
   .momentum-row {
     display: grid;
     grid-template-columns: 1fr;
@@ -6505,7 +7032,16 @@ button.coach-grade-card:focus-visible {
   .league-newspaper-grid,
   .trophy-room-grid,
   .challenge-grid,
-  .coach-grade-grid {
+  .coach-grade-grid,
+  .franchise-continuity-grid,
+  .dynasty-grid,
+  .roster-building-grid,
+  .offseason-grid,
+  .coach-progression-grid,
+  .scenario-grid,
+  .adaptive-ai-grid,
+  .media-world-grid,
+  .power-rankings-grid {
     grid-template-columns: 1fr;
   }
 

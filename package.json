@@ -1,6 +1,6 @@
 {
   "name": "basketball-dice-studio",
-  "version": "1.0.12",
+  "version": "1.0.13",
   "description": "Local-first tabletop basketball dice game studio.",
   "private": true,
   "type": "module",

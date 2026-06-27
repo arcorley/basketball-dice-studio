@@ -59,21 +59,26 @@ import {
 } from "./lib/league";
 import {
   analyzeGameMomentum,
+  buildLeagueWorldSimulation,
   buildLeagueChallenges,
   buildLeagueNewspaper,
   buildLeagueShareHtml,
   buildLeagueTeamIdentityCards,
+  buildScenarioChallengeCards,
+  deriveLeagueCoachProgressionProfiles,
   deriveLeagueAchievements,
   deriveTeamRestPressure,
   detectRivalrySignals,
   gradeTeamPostgame,
   recommendSeriesAdjustments,
+  suggestOpponentAdaptiveGamePlans,
   type CoachGradeLetter,
   type LeagueChallenge,
   type TeamIdentityBadge,
   type TeamPostgameGrade,
   type TeamRestPressure
 } from "./lib/leagueGameSystems";
+import { buildCoachProgressionSummary, buildFranchiseContinuitySnapshot, buildRosterBuildingBoards, recommendSeasonCarryover } from "./lib/franchiseMode";
 import { exportGameCardPdf, exportGamePacketPdf, exportPossessionFlowPdf, exportScoresheetsPdf } from "./lib/pdfExport";
 import { formatNumber, formatPct, loadDiceTeam, loadSourceCatalog } from "./lib/sourceData";
 import { generalDerivationNotes, teamDerivationNotes } from "./lib/teamCards";
@@ -5603,12 +5608,16 @@ function SeasonLeagueView({
           {activeSection === "systems" && (
             <LeagueGameSystemsView
               league={league}
+              leagues={leagues}
               scheduledGames={scheduledGames}
               currentLeagueDate={currentLeagueDate}
               teamNames={teamNames}
+              sourceTeams={sourceTeams}
               sourceTeamsById={sourceTeamsById}
               focusTeamId={focusTeamId}
+              loadTeam={loadTeam}
               onTeamChange={changeFocusTeam}
+              onApplyTeamPlan={applyTeamCoachPlan}
               onOpenGame={setInfoGame}
             />
           )}
@@ -5968,26 +5977,97 @@ function downloadTextFile(filename: string, content: string, type = "text/html")
   URL.revokeObjectURL(url);
 }
 
+function signalToneClass(tone: "positive" | "neutral" | "warning" | "negative"): string {
+  if (tone === "positive") return "positive";
+  if (tone === "warning") return "warning";
+  if (tone === "negative") return "negative";
+  return "";
+}
+
+function scenarioCardClass(progress: number, difficulty: string): string {
+  if (progress >= 1) return "complete";
+  if (difficulty === "legend" || difficulty === "hard") return "warning";
+  return "";
+}
+
+function powerRankingClass(trend: string): string {
+  if (trend === "surging" || trend === "rising") return "rising";
+  if (trend === "sliding" || trend === "reeling") return "falling";
+  return "";
+}
+
+function planDeltaLabel(label: string, value: number | undefined, digits = 0): string {
+  const normalized = value ?? 0;
+  return `${label} ${normalized > 0 ? "+" : ""}${normalized.toFixed(digits)}`;
+}
+
 function LeagueGameSystemsView({
   league,
+  leagues,
   scheduledGames,
   currentLeagueDate,
   teamNames,
+  sourceTeams,
   sourceTeamsById,
   focusTeamId,
+  loadTeam,
   onTeamChange,
+  onApplyTeamPlan,
   onOpenGame
 }: {
   league: LeagueState;
+  leagues: LeagueState[];
   scheduledGames: ScheduledLeagueGame[];
   currentLeagueDate: string;
   teamNames: Map<string, string>;
+  sourceTeams: SourceTeamCatalogEntry[];
   sourceTeamsById: Map<string, SourceTeamCatalogEntry>;
   focusTeamId: string;
+  loadTeam: (teamId: string) => Promise<DiceTeamCard>;
   onTeamChange: (teamId: string) => void;
+  onApplyTeamPlan: (teamId: string, plan: TeamGamePlanOptions) => void;
   onOpenGame: (game: ScheduledLeagueGame) => void;
 }) {
   const scheduledById = useMemo(() => new Map(scheduledGames.map((game) => [game.id, game])), [scheduledGames]);
+  const focusedTeamId = focusTeamId !== allTeamsValue && league.teamIds.includes(focusTeamId) ? focusTeamId : league.teamIds[0] ?? "";
+  const focusedTeamName = focusedTeamId ? teamLabel(teamNames, focusedTeamId) : "Focus team";
+  const activeSeason = sourceTeamsById.get(league.teamIds[0])?.season ?? "";
+  const candidateTeamIds = useMemo(() => {
+    const leagueTeamIds = new Set(league.teamIds);
+    return sourceTeams
+      .filter((team) => !leagueTeamIds.has(team.id) && (!activeSeason || team.season === activeSeason))
+      .sort((a, b) => sourceValue(b.team.wins) - sourceValue(a.team.wins) || a.shortName.localeCompare(b.shortName))
+      .slice(0, 12)
+      .map((team) => team.id);
+  }, [activeSeason, league.teamIds, sourceTeams]);
+  const cardLoadIds = useMemo(() => Array.from(new Set([...league.teamIds, ...candidateTeamIds])), [candidateTeamIds, league.teamIds]);
+  const cardLoadIdKey = cardLoadIds.join("|");
+  const [loadedTeamCards, setLoadedTeamCards] = useState<Record<string, DiceTeamCard>>({});
+  const [rosterCardError, setRosterCardError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    setRosterCardError(null);
+    void Promise.all(cardLoadIds.map((teamId) => loadTeam(teamId)))
+      .then((teams) => {
+        if (!active) return;
+        setLoadedTeamCards(Object.fromEntries(teams.map((team) => [team.id, team])));
+      })
+      .catch((reason: unknown) => {
+        if (active) setRosterCardError(reason instanceof Error ? reason.message : String(reason));
+      });
+    return () => {
+      active = false;
+    };
+  }, [cardLoadIdKey, loadTeam]);
+
+  const leagueTeamCards = useMemo(() => league.teamIds.map((teamId) => loadedTeamCards[teamId]).filter((team): team is DiceTeamCard => Boolean(team)), [league.teamIds, loadedTeamCards]);
+  const candidateTeamCards = useMemo(() => candidateTeamIds.map((teamId) => loadedTeamCards[teamId]).filter((team): team is DiceTeamCard => Boolean(team)), [candidateTeamIds, loadedTeamCards]);
+  const franchiseLeagues = useMemo(() => {
+    const byId = new Map(leagues.map((savedLeague) => [savedLeague.id, savedLeague]));
+    byId.set(league.id, league);
+    return Array.from(byId.values());
+  }, [league, leagues]);
   const teamIdentityCards = useMemo(() => buildLeagueTeamIdentityCards(league, { teamNames }), [league, teamNames]);
   const visibleTeamCards = useMemo(() => {
     const selected = focusTeamId !== allTeamsValue ? teamIdentityCards.find((card) => card.teamId === focusTeamId) : undefined;
@@ -6000,6 +6080,54 @@ function LeagueGameSystemsView({
   const newspaper = useMemo(() => buildLeagueNewspaper(league, { teamNames, currentDate: currentLeagueDate, maxItems: 8 }), [currentLeagueDate, league, teamNames]);
   const achievements = useMemo(() => deriveLeagueAchievements(league, [], { teamNames }).slice(-8).reverse(), [league, teamNames]);
   const challenges = useMemo(() => buildLeagueChallenges(league, { teamNames, maxItems: 8 }), [league, teamNames]);
+  const scenarioCards = useMemo(() => buildScenarioChallengeCards(league, { teamNames, maxItems: 8, maxEntryGames: 2 }), [league, teamNames]);
+  const continuity = useMemo(() => buildFranchiseContinuitySnapshot(franchiseLeagues, { teams: leagueTeamCards, teamNames, includeIncompleteSeasons: true }), [franchiseLeagues, leagueTeamCards, teamNames]);
+  const carryover = useMemo(
+    () => recommendSeasonCarryover(league, { history: franchiseLeagues, teams: leagueTeamCards, teamNames, focusTeamId: focusedTeamId, maxRosterHooks: 6 }),
+    [focusedTeamId, franchiseLeagues, league, leagueTeamCards, teamNames]
+  );
+  const rosterBoards = useMemo(
+    () =>
+      buildRosterBuildingBoards(league, {
+        teams: leagueTeamCards,
+        candidateTeams: candidateTeamCards,
+        focusTeamId: focusedTeamId,
+        teamNames,
+        maxDraftProspects: 6,
+        maxFreeAgents: 8,
+        maxNeedsPerTeam: 3,
+        maxTradePlayersPerTeam: 4
+      }),
+    [candidateTeamCards, focusedTeamId, league, leagueTeamCards, teamNames]
+  );
+  const coachProfiles = useMemo(() => deriveLeagueCoachProgressionProfiles(league, { teamNames }), [league, teamNames]);
+  const visibleCoachProfiles = useMemo(() => {
+    const selected = focusedTeamId ? coachProfiles.find((profile) => profile.teamId === focusedTeamId) : undefined;
+    const sorted = [...coachProfiles].sort((a, b) => b.xp - a.xp || b.unlockedBadges.length - a.unlockedBadges.length || a.teamName.localeCompare(b.teamName));
+    return selected ? [selected, ...sorted.filter((profile) => profile.teamId !== selected.teamId).slice(0, 3)] : sorted.slice(0, 4);
+  }, [coachProfiles, focusedTeamId]);
+  const coachProgram = useMemo(
+    () => (focusedTeamId ? buildCoachProgressionSummary(franchiseLeagues, focusedTeamId, { teams: leagueTeamCards, teamNames }) : null),
+    [focusedTeamId, franchiseLeagues, leagueTeamCards, teamNames]
+  );
+  const adaptiveReport = useMemo(() => suggestOpponentAdaptiveGamePlans(league, { teamNames }), [league, teamNames]);
+  const adaptiveRows = useMemo(() => {
+    const rows = adaptiveReport.teamIds.map((teamId) => adaptiveReport.suggestions[teamId]).filter(Boolean);
+    return rows.sort((a, b) => (a.teamId === focusedTeamId ? -1 : b.teamId === focusedTeamId ? 1 : b.confidence - a.confidence || a.teamName.localeCompare(b.teamName))).slice(0, 6);
+  }, [adaptiveReport, focusedTeamId]);
+  const world = useMemo(
+    () =>
+      buildLeagueWorldSimulation(league, {
+        teamNames,
+        currentDate: currentLeagueDate,
+        maxPowerRankings: 8,
+        maxFanPressureItems: 5,
+        maxRivalries: 5,
+        maxNarratives: 8,
+        maxItems: 5
+      }),
+    [currentLeagueDate, league, teamNames]
+  );
   const shareHtml = useMemo(() => buildLeagueShareHtml(league, { teamNames, title: league.name }), [league, teamNames]);
   const openGameById = (gameId: string | undefined) => {
     const game = gameId ? scheduledById.get(gameId) : undefined;
@@ -6029,6 +6157,302 @@ function LeagueGameSystemsView({
             </button>
           ))}
           {!challenges.length && <p className="empty-state">Challenges appear as games, streaks, and playoff series develop.</p>}
+        </div>
+      </article>
+
+      <article className="league-system-panel league-system-wide">
+        <header>
+          <div>
+            <h3>Scenario Mode</h3>
+            <p>Scored mini-campaigns with objectives, entry games, difficulty, and progress.</p>
+          </div>
+          <span className="badge">{scenarioCards.length.toLocaleString()} scenarios</span>
+        </header>
+        <div className="scenario-grid">
+          {scenarioCards.map((scenario) => {
+            const entry = scenario.recommendedEntryGames[0];
+            const progressPct = Math.round(scenario.scoring.progress * 100);
+            return (
+              <button
+                key={scenario.id}
+                type="button"
+                className={`scenario-card ${scenarioCardClass(scenario.scoring.progress, scenario.difficulty)}`}
+                disabled={!entry}
+                onClick={() => openGameById(entry?.gameId)}
+              >
+                <header>
+                  <span>{scenario.category}</span>
+                  <b className="scenario-difficulty">{scenario.difficulty}</b>
+                </header>
+                <strong>{scenario.title}</strong>
+                <p>{scenario.hook}</p>
+                <div className="league-mode-progress" aria-label={`${scenario.title} progress`}>
+                  <span style={{ width: `${progressPct}%` }} />
+                </div>
+                <small>{scenario.scoring.completionLabel} · {scenario.scoring.points}/{scenario.scoring.maxPoints} pts</small>
+                <div className="scenario-modifier-list">
+                  {scenario.objectives.slice(0, 2).map((objective) => (
+                    <span key={objective.id} className={`scenario-modifier-row ${objective.score.completed ? "" : "warning"}`}>
+                      <span>{objective.label}</span>
+                      <strong>{objective.detail}</strong>
+                      <b>{Math.round(objective.score.progress * 100)}%</b>
+                    </span>
+                  ))}
+                </div>
+              </button>
+            );
+          })}
+          {!scenarioCards.length && <p className="empty-state">Scenario cards appear once the league has an upcoming game or a live standings story.</p>}
+        </div>
+      </article>
+
+      <article className="league-system-panel league-system-wide">
+        <header>
+          <div>
+            <h3>Adaptive AI Plans</h3>
+            <p>Opponent-specific coaching recommendations from recent form, identity, head-to-head history, and schedule pressure.</p>
+          </div>
+          <span className="badge">{adaptiveRows.length.toLocaleString()} plans</span>
+        </header>
+        <div className="adaptive-ai-grid">
+          {adaptiveRows.map((suggestion) => (
+            <section key={suggestion.teamId} className={`adaptive-ai-card ${suggestion.confidence >= 0.68 ? "positive" : "warning"}`}>
+              <header>
+                <span>{suggestion.teamName} vs {suggestion.opponentTeamName}</span>
+                <b className="ai-adaptation-level">{formatPct(suggestion.confidence, 0)}</b>
+              </header>
+              <strong>{suggestion.summary}</strong>
+              <div className="league-world-chip-row">
+                <span className="league-world-chip">{planDeltaLabel("3P", suggestion.suggestedPlan.threePointEmphasis)}</span>
+                <span className="league-world-chip">{planDeltaLabel("FT", suggestion.suggestedPlan.foulPressure)}</span>
+                <span className="league-world-chip">{planDeltaLabel("REB", suggestion.suggestedPlan.crashBoards)}</span>
+                <span className="league-world-chip">{planDeltaLabel("SEC", suggestion.suggestedPlan.ballSecurity)}</span>
+                <span className="league-world-chip">{planDeltaLabel("USG", suggestion.suggestedPlan.usageConcentration, 2)}</span>
+              </div>
+              <div className="adaptive-ai-tendency-list">
+                {suggestion.reasons.slice(0, 2).map((reason) => (
+                  <span key={`${suggestion.teamId}-${reason.type}-${reason.label}`} className={`adaptive-ai-tendency-row ${signalToneClass(reason.tone)}`}>
+                    <span>{reason.label}</span>
+                    <strong>{reason.detail}</strong>
+                    <b>{reason.weight}</b>
+                  </span>
+                ))}
+              </div>
+              <Button icon={<Check size={14} />} onClick={() => onApplyTeamPlan(suggestion.teamId, suggestion.suggestedPlan)}>
+                Apply Plan
+              </Button>
+            </section>
+          ))}
+          {!adaptiveRows.length && <p className="empty-state">Adaptive plans appear when teams have upcoming games.</p>}
+        </div>
+      </article>
+
+      <article className="league-system-panel league-system-wide">
+        <header>
+          <div>
+            <h3>Franchise Continuity</h3>
+            <p>Saved-league history, dynasty tracking, next-season carryover, and roster hooks.</p>
+          </div>
+          <span className="badge">{continuity.totals.seasons.toLocaleString()} seasons</span>
+        </header>
+        <div className="franchise-continuity-grid">
+          <section className="franchise-continuity-card active">
+            <span>Next season setup</span>
+            <strong>{carryover.setup.name}</strong>
+            <p>{carryover.setup.teamIds.length.toLocaleString()} teams · {carryover.setup.gamesPerTeam.toLocaleString()} games per team · starts {formatIsoDate(carryover.setup.seasonStartDate)}</p>
+            <div className="franchise-timeline">
+              {carryover.notes.slice(0, 3).map((note) => (
+                <span key={note} className="franchise-timeline-row">
+                  <span>Carryover</span>
+                  <strong>{note}</strong>
+                  <b>Next</b>
+                </span>
+              ))}
+            </div>
+          </section>
+          <section className="dynasty-card">
+            <span>Dynasty table</span>
+            <strong>{continuity.dynastyTable[0]?.displayName ?? "No dynasty leader yet"}</strong>
+            <p>{continuity.totals.completedGames.toLocaleString()} completed games across saved seasons.</p>
+            <div className="dynasty-milestone-list">
+              {continuity.dynastyTable.slice(0, 4).map((row) => (
+                <span key={row.franchiseKey} className={`dynasty-milestone-row ${row.championships ? "" : "warning"}`}>
+                  <span>{row.displayName}</span>
+                  <strong>{row.regularWins}-{row.regularLosses} · {row.championships} titles</strong>
+                  <b>{row.dynastyScore}</b>
+                </span>
+              ))}
+            </div>
+          </section>
+          <section className="franchise-continuity-card">
+            <span>Season ledger</span>
+            <strong>{continuity.seasons.at(-1)?.leagueName ?? league.name}</strong>
+            <div className="franchise-timeline">
+              {continuity.seasons.slice(-4).reverse().map((season) => (
+                <span key={season.leagueId} className="franchise-timeline-row">
+                  <span>{season.seasonLabel}</span>
+                  <strong>{season.championTeamId ? `${teamLabel(teamNames, season.championTeamId)} champion` : `${season.completedGames}/${season.scheduledGames} games`}</strong>
+                  <b>{season.leaders.points ? `${season.leaders.points.value} PPG` : "Live"}</b>
+                </span>
+              ))}
+            </div>
+          </section>
+        </div>
+      </article>
+
+      <article className="league-system-panel league-system-wide">
+        <header>
+          <div>
+            <h3>Roster Building</h3>
+            <p>Team needs, draft fits, free-agent targets, trade blocks, and offseason hooks.</p>
+          </div>
+          <span className="badge">{rosterBoards.generatedFromGames.toLocaleString()} games</span>
+        </header>
+        {rosterCardError && <p className="empty-state">Roster card load failed: {rosterCardError}</p>}
+        <div className="roster-building-grid">
+          {rosterBoards.teamNeeds.teams
+            .filter((team, index) => team.teamId === focusedTeamId || index < 5)
+            .slice(0, 6)
+            .map((team) => (
+              <section key={team.teamId} className={`roster-building-card ${team.needs[0]?.priority === "high" ? "warning" : ""}`}>
+                <header>
+                  <span>{team.direction}</span>
+                  <b>{team.record}</b>
+                </header>
+                <strong>{team.teamName}</strong>
+                <p>{team.needs[0]?.detail ?? "No urgent roster need detected."}</p>
+                <div className="league-world-chip-row">
+                  {team.needs.slice(0, 3).map((need) => (
+                    <span key={need.area} className="league-world-chip">{need.label} {need.score}</span>
+                  ))}
+                </div>
+              </section>
+            ))}
+        </div>
+        <div className="offseason-grid">
+          {rosterBoards.draftBoard.slice(0, 4).map((prospect) => (
+            <section key={prospect.prospectId} className="offseason-card ready">
+              <header>
+                <span>Draft #{prospect.rank}</span>
+                <b>{prospect.projectedPickBand}</b>
+              </header>
+              <strong>{prospect.archetype}</strong>
+              <p>{prospect.summary}</p>
+              <small>{prospect.position} · upside {prospect.upside} · risk {prospect.risk}</small>
+            </section>
+          ))}
+          {rosterBoards.freeAgentBoard.slice(0, 4).map((target) => (
+            <section key={target.playerId} className="offseason-card">
+              <header>
+                <span>Free agent #{target.rank}</span>
+                <b>{target.estimatedRole}</b>
+              </header>
+              <strong>{target.playerName}</strong>
+              <p>{target.summary}</p>
+              <small>{target.sourceTeamName} · {target.position}{target.age ? ` · ${target.age}` : ""}</small>
+            </section>
+          ))}
+          {rosterBoards.tradeBlock
+            .filter((team) => team.teamId === focusedTeamId || team.availablePlayers.length)
+            .slice(0, 4)
+            .map((team) => (
+              <section key={team.teamId} className="offseason-card warning">
+                <header>
+                  <span>{team.teamName}</span>
+                  <b>{team.direction}</b>
+                </header>
+                <strong>{team.availablePlayers[0]?.playerName ?? team.targetArchetypes[0] ?? "Keep optionality"}</strong>
+                <p>{team.summary}</p>
+                <small>{team.targetArchetypes.slice(0, 2).join(" · ") || "No trade targets yet"}</small>
+              </section>
+            ))}
+        </div>
+      </article>
+
+      <article className="league-system-panel league-system-wide">
+        <header>
+          <div>
+            <h3>Coach RPG</h3>
+            <p>Level, XP, tactical identity, badges, and multi-season development goals.</p>
+          </div>
+          <span className="badge">{focusedTeamName}</span>
+        </header>
+        <div className="coach-progression-grid">
+          {coachProgram && (
+            <section className={`coach-progression-card ${coachProgram.trend === "rising" ? "positive" : coachProgram.trend === "slipping" ? "negative" : ""}`}>
+              <header>
+                <span>{coachProgram.archetype}</span>
+                <b className="coach-skill-level">Lv {coachProgram.level}</b>
+              </header>
+              <strong>{coachProgram.teamName}</strong>
+              <p>{coachProgram.nextDevelopmentGoals[0]}</p>
+              <div className="league-world-chip-row">
+                {coachProgram.badges.slice(0, 3).map((badge) => (
+                  <span key={badge} className="league-world-chip">{badge}</span>
+                ))}
+              </div>
+            </section>
+          )}
+          {visibleCoachProfiles.map((profile) => (
+            <section key={profile.teamId} className={`coach-skill-card ${profile.unlockedBadges.length ? "unlocked" : "locked"}`}>
+              <header>
+                <span>{profile.planProfile.dominantStyle}</span>
+                <b className="coach-skill-level">Lv {profile.level}</b>
+              </header>
+              <strong>{profile.teamName}</strong>
+              <p>{profile.summary}</p>
+              <div className="league-mode-meter">
+                <span>
+                  Grade average
+                  <b>{profile.gradeAverage ? profile.gradeAverage.toFixed(1) : "-"}</b>
+                </span>
+                <div className="league-mode-meter-bar">
+                  <span style={{ width: `${clampNumber(profile.gradeAverage, 0, 100)}%` }} />
+                </div>
+              </div>
+              <small>{profile.unlockedBadges.length}/{profile.badges.length} badges unlocked</small>
+            </section>
+          ))}
+        </div>
+      </article>
+
+      <article className="league-system-panel league-system-wide">
+        <header>
+          <div>
+            <h3>League World</h3>
+            <p>Power rankings, pressure, rivalry heat, and weekly media narratives.</p>
+          </div>
+          <span className="badge">{formatIsoDate(world.generatedAt.slice(0, 10))}</span>
+        </header>
+        <div className="power-rankings-grid">
+          {world.powerRankings.slice(0, 8).map((row) => (
+            <section key={row.teamId} className={`power-ranking-card ${powerRankingClass(row.trend)}`}>
+              <header>
+                <span>{row.trend}</span>
+                <b className="power-ranking-rank">#{row.rank}</b>
+              </header>
+              <strong>{row.teamName}</strong>
+              <p>{row.recordLabel} · {formatPct(row.winPct, 0)} · {row.differentialPerGame > 0 ? "+" : ""}{row.differentialPerGame} diff</p>
+              <small>{row.tags.slice(0, 2).join(" · ") || `Recent ${row.recentForm}`}</small>
+            </section>
+          ))}
+        </div>
+        <div className="media-world-grid">
+          {world.narratives.map((item, index) => (
+            <button key={item.id} type="button" className={`media-world-card ${index === 0 ? "featured" : item.tone === "warning" ? "breaking" : item.tone === "negative" ? "critical" : ""}`} disabled={!item.gameId} onClick={() => openGameById(item.gameId)}>
+              <span>{item.type}</span>
+              <strong>{item.headline}</strong>
+              <p>{item.detail}</p>
+            </button>
+          ))}
+          {world.rivalryHeat.slice(0, 3).map((item) => (
+            <button key={item.pairKey} type="button" className={`media-world-card ${item.tone === "warning" ? "breaking" : ""}`} disabled={!item.nextGameId} onClick={() => openGameById(item.nextGameId)}>
+              <span>{item.level}</span>
+              <strong>{item.labels[0]} vs {item.labels[1]}</strong>
+              <p>{item.detail}</p>
+              <small>{item.heatScore} heat · {item.meetings} meetings</small>
+            </button>
+          ))}
         </div>
       </article>
 
