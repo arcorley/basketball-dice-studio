@@ -4,7 +4,8 @@ release/
 .DS_Store
 *.log
 scripts/__pycache__/
-reports/sanity-*.json
+reports/*.json
+reports/*.md
 data/teams.generated.json
 src/data/teams.generated.json
 data/app-state.sqlite*
