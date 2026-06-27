@@ -7,6 +7,7 @@ import { defineConfig, type Plugin, type PreviewServer, type ViteDevServer } fro
 const rootDir = dirname(fileURLToPath(import.meta.url));
 const appStateScript = resolve(rootDir, "scripts/app-state-sqlite.py");
 const validStateKeys = new Set(["tournament", "season-league", "season-leagues"]);
+const appStateMaxBuffer = 64 * 1024 * 1024;
 
 function readBody(request: NodeJS.ReadableStream): Promise<string> {
   return new Promise((resolveBody, reject) => {
@@ -22,7 +23,7 @@ function readBody(request: NodeJS.ReadableStream): Promise<string> {
 
 function runStateCommand(action: "read" | "write" | "delete", key: string, body?: string): Promise<string> {
   return new Promise((resolveCommand, reject) => {
-    const child = execFile("python3", [appStateScript, action, key], { cwd: rootDir }, (error, stdout, stderr) => {
+    const child = execFile("python3", [appStateScript, action, key], { cwd: rootDir, maxBuffer: appStateMaxBuffer }, (error, stdout, stderr) => {
       if (error) {
         reject(new Error(stderr.trim() || error.message));
         return;

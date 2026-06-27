@@ -57,6 +57,23 @@ import {
   standings,
   syncLeaguePlayoffs
 } from "./lib/league";
+import {
+  analyzeGameMomentum,
+  buildLeagueChallenges,
+  buildLeagueNewspaper,
+  buildLeagueShareHtml,
+  buildLeagueTeamIdentityCards,
+  deriveLeagueAchievements,
+  deriveTeamRestPressure,
+  detectRivalrySignals,
+  gradeTeamPostgame,
+  recommendSeriesAdjustments,
+  type CoachGradeLetter,
+  type LeagueChallenge,
+  type TeamIdentityBadge,
+  type TeamPostgameGrade,
+  type TeamRestPressure
+} from "./lib/leagueGameSystems";
 import { exportGameCardPdf, exportGamePacketPdf, exportPossessionFlowPdf, exportScoresheetsPdf } from "./lib/pdfExport";
 import { formatNumber, formatPct, loadDiceTeam, loadSourceCatalog } from "./lib/sourceData";
 import { generalDerivationNotes, teamDerivationNotes } from "./lib/teamCards";
@@ -90,7 +107,7 @@ type PlaySpeed = "manual" | "slow" | "normal" | "fast";
 type SimulatorMode = "play" | "simulate";
 type SimulationRunMode = "single" | "batch";
 type WatchGameView = "game" | "box";
-type CompetitionSection = "hq" | "schedule" | "postseason" | "standings" | "leaders" | "team" | "history";
+type CompetitionSection = "hq" | "schedule" | "postseason" | "standings" | "leaders" | "team" | "history" | "systems";
 type PostseasonBracketView = "playoffs" | "play-in";
 type LeaguePreset = "season" | "franchise-best" | "best-record";
 type LeagueStatusFilter = "all" | "unplayed" | "played" | "simulated" | "manual";
@@ -259,6 +276,11 @@ function activeCoachPresetId(plan: TeamGamePlanOptions | undefined): CoachPlanPr
   const key = teamGamePlanOptionsKey(plan);
   return coachPlanPresets.find((preset) => teamGamePlanOptionsKey(preset.plan) === key)?.id ?? null;
 }
+
+function coachPresetById(id: CoachPlanPresetId): CoachPlanPreset {
+  return coachPlanPresets.find((preset) => preset.id === id) ?? coachPlanPresets[0];
+}
+
 type TeamLeaderRow = { teamId: string; line: StatLine & { games: number } };
 type PlayerLeaderRow = ReturnType<typeof aggregatePlayerStats>[number];
 type SeasonStatLine = StatLine & { games: number };
@@ -336,6 +358,55 @@ interface LeagueTimelineItem {
   title: string;
   detail: string;
   complete: boolean;
+}
+
+interface LeagueGameScoutingTeam {
+  teamId: string;
+  role: "Away" | "Home";
+  record: string;
+  seedLabel: string;
+  formLabel: string;
+  streak: string;
+  venueRecord: string;
+  offenseRank: number;
+  defenseRank: number;
+  ppg: string;
+  oppPpg: string;
+  plan: CoachPlanPreset;
+  planReason: string;
+  activePlanId: CoachPlanPresetId | null;
+}
+
+interface LeagueGameScoutingReport {
+  stakesLabel: string;
+  stakesDetail: string;
+  headToHeadLabel: string;
+  headToHeadDetail: string;
+  styleLabel: string;
+  styleDetail: string;
+  teams: LeagueGameScoutingTeam[];
+}
+
+interface GameRecapPerformer {
+  teamId: string;
+  player: string;
+  line: string;
+  score: number;
+}
+
+interface GameRecapFactor {
+  label: string;
+  title: string;
+  detail: string;
+}
+
+interface GameRecap {
+  headline: string;
+  subhead: string;
+  quarterTitle: string;
+  quarterDetail: string;
+  topPerformers: GameRecapPerformer[];
+  factors: GameRecapFactor[];
 }
 
 interface CoachPlanPreset {
@@ -3864,6 +3935,119 @@ function GameResultContent({ result, away, home, showHeader = true }: { result: 
   );
 }
 
+function GameRecapPanel({ result, teamNames }: { result: GameResult; teamNames: Map<string, string> }) {
+  const recap = useMemo(() => buildGameRecap(result, teamNames), [result, teamNames]);
+  return (
+    <section className="game-recap-panel">
+      <div className="team-card-section-title">
+        <h4>Postgame Recap</h4>
+        <span>{result.source}</span>
+      </div>
+      <div className="game-recap-hero">
+        <div>
+          <span>Final story</span>
+          <strong>{recap.headline}</strong>
+          <small>{recap.subhead}</small>
+        </div>
+        <div>
+          <span>Biggest swing</span>
+          <strong>{recap.quarterTitle}</strong>
+          <small>{recap.quarterDetail}</small>
+        </div>
+      </div>
+      <div className="game-recap-grid">
+        <section>
+          <h5>Top Performers</h5>
+          <div className="game-recap-list">
+            {recap.topPerformers.map((performer) => (
+              <div key={`${performer.teamId}:${performer.player}`} className="game-recap-row">
+                <PlayerNameButton teamId={performer.teamId} player={performer.player} />
+                <span>{teamLabel(teamNames, performer.teamId)}</span>
+                <strong>{performer.line}</strong>
+              </div>
+            ))}
+            {!recap.topPerformers.length && <p className="empty-state">No player lines were saved for this result.</p>}
+          </div>
+        </section>
+        <section>
+          <h5>Deciding Factors</h5>
+          <div className="game-recap-list">
+            {recap.factors.map((factor) => (
+              <div key={`${factor.label}:${factor.title}`} className="game-recap-row factor">
+                <span>{factor.label}</span>
+                <strong>{factor.title}</strong>
+                <small>{factor.detail}</small>
+              </div>
+            ))}
+            {!recap.factors.length && <p className="empty-state">No decisive stat edge stood out.</p>}
+          </div>
+        </section>
+      </div>
+    </section>
+  );
+}
+
+function coachGradeClass(letter: CoachGradeLetter): string {
+  return `grade-${letter[0].toLowerCase()}`;
+}
+
+function coachGradeTone(grade: TeamPostgameGrade): string {
+  if (grade.numericScore >= 80) return "positive";
+  if (grade.numericScore < 68) return "negative";
+  if (grade.numericScore < 75) return "warning";
+  return "";
+}
+
+function GameSystemsAnalysisPanel({ result, teamNames }: { result: GameResult; teamNames: Map<string, string> }) {
+  const momentum = useMemo(() => analyzeGameMomentum(result, { teamNames }), [result, teamNames]);
+  const grades = useMemo(() => [gradeTeamPostgame(result, result.awayTeamId), gradeTeamPostgame(result, result.homeTeamId)], [result]);
+  const winnerLabel = momentum.winnerTeamId ? teamLabel(teamNames, momentum.winnerTeamId) : "Tie";
+  const winPct = Math.round(momentum.finalWinProbability * 100);
+
+  return (
+    <section className="game-recap-panel">
+      <div className="team-card-section-title">
+        <h4>Momentum and Coach Grade</h4>
+        <span>{momentum.leverageLabel}</span>
+      </div>
+      <div className="momentum-grid">
+        <div>
+          {momentum.rows.length ? (
+            momentum.rows.map((row) => (
+              <div key={row.periodLabel} className={`momentum-row ${row.leadChange ? "warning" : row.swingTeamId === momentum.winnerTeamId ? "positive" : row.swingTeamId ? "negative" : ""}`}>
+                <span>{row.periodLabel}</span>
+                <strong>{row.narrative}</strong>
+                <b>{row.awayCumulative}-{row.homeCumulative}</b>
+              </div>
+            ))
+          ) : (
+            <p className="empty-state">Manual result has no period momentum data.</p>
+          )}
+        </div>
+        <div className="win-prob-card">
+          <span>Final leverage</span>
+          <strong>{winPct}%</strong>
+          <small>{winnerLabel} finish probability from period score flow.</small>
+          <div className="win-prob-bar" aria-label="Final win probability">
+            <span style={{ width: `${winPct}%` }} />
+          </div>
+          <p>{momentum.turningPoint.title}: {momentum.turningPoint.detail}</p>
+        </div>
+      </div>
+      <div className="coach-grade-grid">
+        {grades.map((grade) => (
+          <div key={grade.teamId} className={`coach-grade-card ${coachGradeClass(grade.letter)} ${coachGradeTone(grade)}`}>
+            <span>{teamLabel(teamNames, grade.teamId)}</span>
+            <strong>{grade.letter}</strong>
+            <small>{grade.numericScore}/100 · {grade.outcome}</small>
+            <p>{grade.summary}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function ResultAvailabilityEvents({ result, teams }: { result: GameResult; teams: DiceTeamCard[] }) {
   const events = result.playerAvailabilityEvents ?? [];
   if (!events.length) return null;
@@ -4602,6 +4786,11 @@ function SeasonLeagueView({
     changeLeagueMatchupOptions(setTeamPlanForMatchupOptions(defaultLeagueMatchupOptions(league), focusTeamId, plan));
   };
 
+  const applyTeamCoachPlan = (teamId: string, plan: TeamGamePlanOptions) => {
+    if (!league || !league.teamIds.includes(teamId)) return;
+    changeLeagueMatchupOptions(setTeamPlanForMatchupOptions(defaultLeagueMatchupOptions(league), teamId, plan));
+  };
+
   const previewBatchSimulation = () => {
     setLeagueError(null);
     if (!filteredUnplayedGames.length) {
@@ -5144,6 +5333,10 @@ function SeasonLeagueView({
               <Archive size={16} />
               <span>History</span>
             </button>
+            <button type="button" className={activeSection === "systems" ? "active" : ""} onClick={() => setSection("systems")}>
+              <Target size={16} />
+              <span>Systems</span>
+            </button>
           </div>
           {leagueError && (
             <article className="panel">
@@ -5407,6 +5600,18 @@ function SeasonLeagueView({
               onOpenGame={setInfoGame}
             />
           )}
+          {activeSection === "systems" && (
+            <LeagueGameSystemsView
+              league={league}
+              scheduledGames={scheduledGames}
+              currentLeagueDate={currentLeagueDate}
+              teamNames={teamNames}
+              sourceTeamsById={sourceTeamsById}
+              focusTeamId={focusTeamId}
+              onTeamChange={changeFocusTeam}
+              onOpenGame={setInfoGame}
+            />
+          )}
           {manualGame && (
             <ManualResultFormLoader
               game={manualGame}
@@ -5452,6 +5657,7 @@ function SeasonLeagueView({
                 commitLeague(markUnplayed(league, infoGame.id));
                 setInfoGame(null);
               }}
+              onApplyTeamPlan={applyTeamCoachPlan}
             />
           )}
           {batchRequest && (
@@ -5729,6 +5935,234 @@ function LeagueHistoryView({
   );
 }
 
+function identityMeterPct(badge: TeamIdentityBadge): number {
+  if (badge.dimension === "shotDiet") return clampNumber((badge.score / 0.62) * 100, 0, 100);
+  if (badge.dimension === "starReliance") return clampNumber((badge.score / 0.42) * 100, 0, 100);
+  return clampNumber(((badge.score + 10) / 20) * 100, 0, 100);
+}
+
+function identityToneClass(tone: TeamIdentityBadge["tone"]): string {
+  if (tone === "warning") return "warning";
+  if (tone === "negative") return "critical";
+  return "";
+}
+
+function restPressureClass(rest: TeamRestPressure): string {
+  if (rest.level === "schedule-crunch") return "critical";
+  if (rest.level === "back-to-back" || rest.level === "tight") return "warning";
+  return "";
+}
+
+function challengeToneClass(challenge: LeagueChallenge): string {
+  if (challenge.priority === "high") return "warning";
+  if (challenge.priority === "low") return "complete";
+  return "";
+}
+
+function downloadTextFile(filename: string, content: string, type = "text/html"): void {
+  const url = URL.createObjectURL(new Blob([content], { type }));
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+function LeagueGameSystemsView({
+  league,
+  scheduledGames,
+  currentLeagueDate,
+  teamNames,
+  sourceTeamsById,
+  focusTeamId,
+  onTeamChange,
+  onOpenGame
+}: {
+  league: LeagueState;
+  scheduledGames: ScheduledLeagueGame[];
+  currentLeagueDate: string;
+  teamNames: Map<string, string>;
+  sourceTeamsById: Map<string, SourceTeamCatalogEntry>;
+  focusTeamId: string;
+  onTeamChange: (teamId: string) => void;
+  onOpenGame: (game: ScheduledLeagueGame) => void;
+}) {
+  const scheduledById = useMemo(() => new Map(scheduledGames.map((game) => [game.id, game])), [scheduledGames]);
+  const teamIdentityCards = useMemo(() => buildLeagueTeamIdentityCards(league, { teamNames }), [league, teamNames]);
+  const visibleTeamCards = useMemo(() => {
+    const selected = focusTeamId !== allTeamsValue ? teamIdentityCards.find((card) => card.teamId === focusTeamId) : undefined;
+    return selected ? [selected, ...teamIdentityCards.filter((card) => card.teamId !== selected.teamId).slice(0, 5)] : teamIdentityCards.slice(0, 6);
+  }, [focusTeamId, teamIdentityCards]);
+  const fatigueRows = useMemo(() => {
+    const focusFirst = focusTeamId !== allTeamsValue ? [focusTeamId, ...league.teamIds.filter((teamId) => teamId !== focusTeamId)] : league.teamIds;
+    return focusFirst.slice(0, 8).map((teamId) => deriveTeamRestPressure(league, teamId));
+  }, [focusTeamId, league]);
+  const newspaper = useMemo(() => buildLeagueNewspaper(league, { teamNames, currentDate: currentLeagueDate, maxItems: 8 }), [currentLeagueDate, league, teamNames]);
+  const achievements = useMemo(() => deriveLeagueAchievements(league, [], { teamNames }).slice(-8).reverse(), [league, teamNames]);
+  const challenges = useMemo(() => buildLeagueChallenges(league, { teamNames, maxItems: 8 }), [league, teamNames]);
+  const shareHtml = useMemo(() => buildLeagueShareHtml(league, { teamNames, title: league.name }), [league, teamNames]);
+  const openGameById = (gameId: string | undefined) => {
+    const game = gameId ? scheduledById.get(gameId) : undefined;
+    if (game) onOpenGame(game);
+  };
+
+  return (
+    <div className="league-game-systems-layout">
+      <article className="league-system-panel league-system-wide">
+        <header>
+          <div>
+            <h3>Challenge Mode</h3>
+            <p>Generated objectives from the current schedule, streaks, upset spots, rivalry state, and playoff pressure.</p>
+          </div>
+          <span className="badge">{challenges.length.toLocaleString()} active</span>
+        </header>
+        <div className="challenge-grid">
+          {challenges.map((challenge) => (
+            <button key={challenge.id} type="button" className={`challenge-card ${challengeToneClass(challenge)}`} disabled={!challenge.gameId} onClick={() => openGameById(challenge.gameId)}>
+              <Target size={20} aria-hidden="true" />
+              <span>{challenge.category}</span>
+              <strong>{challenge.title}</strong>
+              <p>{challenge.detail}</p>
+              <div className="challenge-progress" aria-hidden="true">
+                <span style={{ width: challenge.priority === "high" ? "85%" : challenge.priority === "medium" ? "58%" : "34%" }} />
+              </div>
+            </button>
+          ))}
+          {!challenges.length && <p className="empty-state">Challenges appear as games, streaks, and playoff series develop.</p>}
+        </div>
+      </article>
+
+      <article className="league-system-panel league-system-wide">
+        <header>
+          <div>
+            <h3>Team Identity Cards</h3>
+            <p>Live profiles for pace, shot diet, star reliance, glass pressure, and defense.</p>
+          </div>
+          <label className="league-team-select">
+            Focus
+            <select value={focusTeamId} onChange={(event) => onTeamChange(event.target.value)}>
+              <option value={allTeamsValue}>All teams</option>
+              {league.teamIds.map((teamId) => (
+                <option key={teamId} value={teamId}>
+                  {sourceTeamsById.get(teamId)?.shortName ?? teamLabel(teamNames, teamId)}
+                </option>
+              ))}
+            </select>
+          </label>
+        </header>
+        <div className="team-identity-grid">
+          {visibleTeamCards.map((card) => (
+            <section key={card.teamId} className={`team-identity-card ${card.teamId === focusTeamId ? "active" : ""}`}>
+              <header>
+                <TeamIdentityButton team={sourceTeamsById.get(card.teamId)} teamId={card.teamId} teamNames={teamNames} className="standings-team compact-team-identity" />
+                <span>{card.sampleGames} GP</span>
+              </header>
+              {card.sampleGames === 0 ? (
+                <div className="team-identity-empty">
+                  <strong>Needs games</strong>
+                  <span>Save or simulate a result to unlock pace, shot diet, star usage, glass, and defense reads.</span>
+                </div>
+              ) : (
+                <div className="team-identity-meters">
+                  {Object.values(card.badges).map((badge) => (
+                    <div key={badge.dimension} className={`team-identity-meter ${identityToneClass(badge.tone)}`}>
+                      <span>
+                        {badge.label}
+                        <b>{badge.value}</b>
+                      </span>
+                      <div className="team-identity-meter-bar" aria-label={`${badge.label} meter`}>
+                        <span style={{ width: `${identityMeterPct(badge)}%` }} />
+                      </div>
+                      <small>{badge.detail}</small>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <p>{card.sampleGames === 0 ? "No profile yet." : card.strengths[0] ?? card.concerns[0] ?? "Identity sharpens as more games are saved."}</p>
+            </section>
+          ))}
+        </div>
+      </article>
+
+      <article className="league-system-panel">
+        <header>
+          <div>
+            <h3>Fatigue and Rest</h3>
+            <p>Schedule pressure from rest days and recent game density.</p>
+          </div>
+        </header>
+        <div className="fatigue-grid">
+          {fatigueRows.map((rest) => (
+            <button key={rest.teamId} type="button" className={`fatigue-card ${restPressureClass(rest)}`} disabled={!rest.gameId} onClick={() => openGameById(rest.gameId)}>
+              <span>{teamLabel(teamNames, rest.teamId)}</span>
+              <strong>{rest.label}</strong>
+              <small>{rest.date ? formatIsoDate(rest.date) : "No upcoming game"}</small>
+              <p>{rest.detail}</p>
+            </button>
+          ))}
+        </div>
+      </article>
+
+      <article className="league-system-panel">
+        <header>
+          <div>
+            <h3>League Newspaper</h3>
+            <p>Weekly-style story feed from standings, leaders, upsets, schedule, and playoff state.</p>
+          </div>
+        </header>
+        <div className="league-newspaper-grid">
+          {newspaper.map((item, index) => (
+            <button key={item.id} type="button" className={`league-newspaper-story ${index === 0 ? "featured" : item.tone === "warning" ? "breaking" : ""}`} disabled={!item.gameId} onClick={() => openGameById(item.gameId)}>
+              <span>{item.section}</span>
+              <strong>{item.headline}</strong>
+              <p>{item.detail}</p>
+              {item.date && <small>{formatIsoDate(item.date)}</small>}
+            </button>
+          ))}
+          {!newspaper.length && <p className="empty-state">The newspaper fills in once the league has results or upcoming games.</p>}
+        </div>
+      </article>
+
+      <article className="league-system-panel">
+        <header>
+          <div>
+            <h3>Trophy Room</h3>
+            <p>Save-local achievements generated from milestones, records, and playoff completion.</p>
+          </div>
+          <span className="badge">{achievements.length.toLocaleString()}</span>
+        </header>
+        <div className="trophy-room-grid">
+          {achievements.map((achievement) => (
+            <button key={achievement.id} type="button" className="trophy-card" disabled={!achievement.gameId} onClick={() => openGameById(achievement.gameId)}>
+              <Trophy size={20} aria-hidden="true" />
+              <span>{achievement.tier}</span>
+              <strong>{achievement.title}</strong>
+              <p>{achievement.detail}</p>
+              <small>{formatIsoDate(achievement.unlockedAt.slice(0, 10))}</small>
+            </button>
+          ))}
+          {!achievements.length && <p className="empty-state">Achievements unlock as the league produces results.</p>}
+        </div>
+      </article>
+
+      <article className="league-system-panel share-report-panel">
+        <div>
+          <h3>Shareable League Report</h3>
+          <p>Export a compact HTML recap with standings, headlines, leaders, and achievements.</p>
+        </div>
+        <div className="share-report-actions">
+          <Button icon={<Download size={16} />} onClick={() => downloadTextFile(`${league.name.replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "").toLowerCase() || "league"}-report.html`, shareHtml)}>
+            Download HTML
+          </Button>
+          <Button icon={<FileText size={16} />} onClick={() => void navigator.clipboard?.writeText(shareHtml)}>
+            Copy HTML
+          </Button>
+        </div>
+      </article>
+    </div>
+  );
+}
+
 function LeaguePostseasonPanel({
   league,
   seeds,
@@ -5931,6 +6365,7 @@ function LeaguePostseasonPanel({
           )}
           {selectedSeries && selectedSeriesState && (
             <PostseasonSeriesModal
+              league={league}
               series={selectedSeries}
               state={selectedSeriesState}
               games={selectedSeriesGames}
@@ -6265,6 +6700,7 @@ function PlayInGameCard({
 }
 
 function PostseasonSeriesModal({
+  league,
   series,
   state,
   games,
@@ -6275,6 +6711,7 @@ function PostseasonSeriesModal({
   onOpenGame,
   onClose
 }: {
+  league: LeagueState;
   series: LeaguePlayoffSeries;
   state: ReturnType<typeof playoffSeriesState>;
   games: ScheduledLeagueGame[];
@@ -6286,6 +6723,7 @@ function PostseasonSeriesModal({
   onClose: () => void;
 }) {
   const winnerLabel = state.winnerTeamId ? `${teamLabel(teamNames, state.winnerTeamId)} wins series` : nextGame ? `Game ${nextGame.playoffGameNumber}` : "Awaiting result";
+  const adjustmentReport = useMemo(() => recommendSeriesAdjustments(league, series, { teamNames }), [league, series, teamNames]);
   return (
     <div className="modal-backdrop" onMouseDown={onClose}>
       <article className="panel postseason-series-modal" role="dialog" aria-modal="true" aria-labelledby="postseason-series-title" onMouseDown={(event) => event.stopPropagation()}>
@@ -6300,6 +6738,29 @@ function PostseasonSeriesModal({
           {renderTeam(series.teamAId, series.seedA, state.winsA)}
           {renderTeam(series.teamBId, series.seedB, state.winsB)}
         </div>
+        {adjustmentReport.completedGames > 0 && (
+          <section className="league-system-panel league-system-wide">
+            <header>
+              <div>
+                <h4>Series Adjustments</h4>
+                <p>{adjustmentReport.roundName} counters from completed games.</p>
+              </div>
+              <span className="badge">{adjustmentReport.completedGames} games</span>
+            </header>
+            <div className="series-adjustment-grid">
+              {adjustmentReport.teams.flatMap((team) =>
+                team.items.map((item) => (
+                  <div key={`${team.teamId}:${item.id}`} className={`series-adjustment-card ${item.priority === "high" ? "warning" : item.priority === "low" ? "positive" : ""}`}>
+                    <span>{team.teamName} · {item.area}</span>
+                    <strong>{item.title}</strong>
+                    <small>{item.metric ?? team.statusLabel}</small>
+                    <p>{item.detail}</p>
+                  </div>
+                ))
+              )}
+            </div>
+          </section>
+        )}
         <div className="series-modal-games">
           {games.map((game) => {
             const played = Boolean(game.result);
@@ -6652,6 +7113,131 @@ function gameResultDetail(game: ScheduledLeagueGame, teamNames: Map<string, stri
   return `${formatIsoDate(game.date)} · ${leagueGameLabel(game, teamNames)} · ${gameScoreline(game)}`;
 }
 
+function resultTeamScore(result: GameResult, teamId: string): number {
+  if (teamId === result.awayTeamId) return result.awayScore;
+  if (teamId === result.homeTeamId) return result.homeScore;
+  return stat(result.teamStats[teamId], "PTS");
+}
+
+function resultOpponentTeamId(result: GameResult, teamId: string): string {
+  return teamId === result.awayTeamId ? result.homeTeamId : result.awayTeamId;
+}
+
+function performerLine(line: StatLine): string {
+  return `${stat(line, "PTS")} PTS, ${stat(line, "REB")} REB, ${stat(line, "AST")} AST`;
+}
+
+function performerScore(line: StatLine): number {
+  return stat(line, "PTS") + stat(line, "REB") * 1.15 + stat(line, "AST") * 1.35 + stat(line, "STL") * 2 + stat(line, "BLK") * 2 - stat(line, "TOV") * 0.8;
+}
+
+function topGamePerformers(result: GameResult): GameRecapPerformer[] {
+  return Object.entries(result.playerStats)
+    .flatMap(([teamId, playerLines]) =>
+      Object.entries(playerLines).map(([player, line]) => ({
+        teamId,
+        player,
+        line: performerLine(line),
+        score: performerScore(line)
+      }))
+    )
+    .sort((a, b) => b.score - a.score || a.player.localeCompare(b.player))
+    .slice(0, 4);
+}
+
+function gameRecapFactor(
+  label: string,
+  awayValue: number,
+  homeValue: number,
+  result: GameResult,
+  teamNames: Map<string, string>,
+  options: { higherBetter?: boolean; suffix?: string; minimumEdge?: number } = {}
+): GameRecapFactor | null {
+  const higherBetter = options.higherBetter ?? true;
+  const minimumEdge = options.minimumEdge ?? 1;
+  const edge = Math.abs(awayValue - homeValue);
+  if (edge < minimumEdge) return null;
+  const awayWon = higherBetter ? awayValue > homeValue : awayValue < homeValue;
+  const leaderTeamId = awayWon ? result.awayTeamId : result.homeTeamId;
+  const leaderValue = awayWon ? awayValue : homeValue;
+  const trailerValue = awayWon ? homeValue : awayValue;
+  const suffix = options.suffix ?? "";
+  return {
+    label,
+    title: `${teamLabel(teamNames, leaderTeamId)} ${leaderValue}${suffix}`,
+    detail: `${leaderValue}-${trailerValue}${suffix} edge`
+  };
+}
+
+function biggestQuarterSwing(result: GameResult, teamNames: Map<string, string>): { title: string; detail: string } {
+  const best = result.quarters
+    .map((quarter, index) => {
+      const awayEdge = quarter.away - quarter.home;
+      const leaderTeamId = awayEdge >= 0 ? result.awayTeamId : result.homeTeamId;
+      return {
+        index,
+        leaderTeamId,
+        edge: Math.abs(awayEdge),
+        away: quarter.away,
+        home: quarter.home
+      };
+    })
+    .sort((a, b) => b.edge - a.edge)[0];
+
+  if (!best || best.edge === 0) {
+    return {
+      title: "No clear period swing",
+      detail: result.quarters.length ? "Period scoring stayed even." : "Manual entry has no period scoring."
+    };
+  }
+
+  return {
+    title: `${periodLabel(best.index, result.quarters.length)}: ${teamLabel(teamNames, best.leaderTeamId)} +${best.edge}`,
+    detail: `${best.away}-${best.home} period score`
+  };
+}
+
+function buildGameRecap(result: GameResult, teamNames: Map<string, string>): GameRecap {
+  const margin = Math.abs(result.awayScore - result.homeScore);
+  const winnerTeamId = result.winnerTeamId !== "tie" ? result.winnerTeamId : undefined;
+  const loserTeamId = winnerTeamId ? resultOpponentTeamId(result, winnerTeamId) : undefined;
+  const winnerName = winnerTeamId ? teamLabel(teamNames, winnerTeamId) : "Tie";
+  const loserName = loserTeamId ? teamLabel(teamNames, loserTeamId) : "game";
+  const scoreText = `${result.awayScore}-${result.homeScore}`;
+  const headline =
+    result.winnerTeamId === "tie"
+      ? `Tie game saved at ${scoreText}`
+      : margin <= 5
+        ? `${winnerName} survives ${loserName}`
+        : `${winnerName} beats ${loserName} by ${margin}`;
+  const awayLine = result.teamStats[result.awayTeamId] ?? {};
+  const homeLine = result.teamStats[result.homeTeamId] ?? {};
+  const factors = [
+    margin <= 5
+      ? {
+          label: "Close finish",
+          title: `${margin}-point margin`,
+          detail: `${scoreText} final`
+        }
+      : null,
+    gameRecapFactor("Glass", stat(awayLine, "REB"), stat(homeLine, "REB"), result, teamNames, { minimumEdge: 4 }),
+    gameRecapFactor("Ball security", stat(awayLine, "TOV"), stat(homeLine, "TOV"), result, teamNames, { higherBetter: false, minimumEdge: 3 }),
+    gameRecapFactor("Three-point edge", stat(awayLine, "3PM"), stat(homeLine, "3PM"), result, teamNames, { minimumEdge: 3 }),
+    gameRecapFactor("Free throws", stat(awayLine, "FTM"), stat(homeLine, "FTM"), result, teamNames, { minimumEdge: 4 }),
+    gameRecapFactor("Creation", stat(awayLine, "AST"), stat(homeLine, "AST"), result, teamNames, { minimumEdge: 5 })
+  ].filter((factor): factor is GameRecapFactor => Boolean(factor));
+  const quarter = biggestQuarterSwing(result, teamNames);
+
+  return {
+    headline,
+    subhead: `${scoreText} final · ${result.source} result · ${result.possessionsEach} possessions/team`,
+    quarterTitle: quarter.title,
+    quarterDetail: quarter.detail,
+    topPerformers: topGamePerformers(result),
+    factors: factors.slice(0, 4)
+  };
+}
+
 function teamStatPerGame(line: SeasonStatLine | undefined, field: string): number {
   return line?.games ? (seasonLineValue(line, field) ?? 0) / line.games : 0;
 }
@@ -6661,6 +7247,276 @@ function teamRankMap(teamIds: string[], valueForTeam: (teamId: string) => number
     .map((teamId) => ({ teamId, value: valueForTeam(teamId) }))
     .sort((a, b) => (descending ? b.value - a.value : a.value - b.value) || a.teamId.localeCompare(b.teamId));
   return new Map(ranked.map((row, index) => [row.teamId, index + 1]));
+}
+
+function gameChronologyCompare(a: ScheduledLeagueGame, b: ScheduledLeagueGame): number {
+  return a.date.localeCompare(b.date) || a.sequence - b.sequence;
+}
+
+function completedGamesBefore(scheduledGames: ScheduledLeagueGame[], target: ScheduledLeagueGame): ScheduledLeagueGame[] {
+  return scheduledGames
+    .filter((game) => game.id !== target.id && game.result && gameChronologyCompare(game, target) <= 0)
+    .sort(gameChronologyCompare);
+}
+
+function teamsShareMatchup(game: Pick<LeagueGame, "awayTeamId" | "homeTeamId">, teamAId: string, teamBId: string): boolean {
+  return (
+    (game.awayTeamId === teamAId && game.homeTeamId === teamBId) ||
+    (game.awayTeamId === teamBId && game.homeTeamId === teamAId)
+  );
+}
+
+function rankLabel(rank: number, total: number): string {
+  return total ? `#${rank} of ${total}` : "-";
+}
+
+function rate(numerator: number | undefined, denominator: number | undefined): number {
+  return denominator ? (numerator ?? 0) / denominator : 0;
+}
+
+function leagueRate(teamStats: Record<string, SeasonStatLine>, numeratorField: string, denominatorField: string): number {
+  const totals = Object.values(teamStats).reduce(
+    (sum, line) => ({
+      numerator: sum.numerator + (seasonLineValue(line, numeratorField) ?? 0),
+      denominator: sum.denominator + (seasonLineValue(line, denominatorField) ?? 0)
+    }),
+    { numerator: 0, denominator: 0 }
+  );
+  return rate(totals.numerator, totals.denominator);
+}
+
+function scoutingSeedLabel(teamId: string, seedsByTeamId: Map<string, StandingsSeed>, sourceTeamsById: Map<string, SourceTeamCatalogEntry>): string {
+  const seed = seedsByTeamId.get(teamId);
+  if (seed) return `#${seed.seed} ${seed.conference}`;
+  return standingsAlignmentForTeam(sourceTeamsById.get(teamId)).conference;
+}
+
+function buildGameStakesLabel(
+  game: ScheduledLeagueGame,
+  seedsByTeamId: Map<string, StandingsSeed>,
+  completedRegularPct: number,
+  teamNames: Map<string, string>
+): { label: string; detail: string } {
+  if (game.stage === "playoffs") {
+    return {
+      label: game.playoffSeriesLabel ?? "Playoff series",
+      detail: game.playoffGameNumber ? `Game ${game.playoffGameNumber} can swing the bracket.` : "Series game with bracket consequences."
+    };
+  }
+  if (game.stage === "play-in") {
+    return {
+      label: "Play-in pressure",
+      detail: "A single result can decide seeding or elimination."
+    };
+  }
+
+  const awaySeed = seedsByTeamId.get(game.awayTeamId);
+  const homeSeed = seedsByTeamId.get(game.homeTeamId);
+  const seedRows = [
+    awaySeed ? { teamId: game.awayTeamId, ...awaySeed } : null,
+    homeSeed ? { teamId: game.homeTeamId, ...homeSeed } : null
+  ].filter((seed): seed is StandingsSeed & { teamId: string } => Boolean(seed));
+  const bubbleTeam = seedRows.find((seed) => seed.seed >= 7 && seed.seed <= 11);
+  const contenderPair = seedRows.length === 2 && seedRows.every((seed) => seed.seed <= 6);
+  const sameConference = awaySeed && homeSeed && awaySeed.conference === homeSeed.conference;
+
+  if (bubbleTeam && completedRegularPct >= 45) {
+    return {
+      label: "Playoff race swing",
+      detail: `${teamLabel(teamNames, bubbleTeam.teamId)} is sitting ${scoutingSeedText(bubbleTeam)} with the cut line in play.`
+    };
+  }
+  if (contenderPair && sameConference) {
+    return {
+      label: "Top-seed test",
+      detail: "Two playoff-position teams can shift home-court leverage."
+    };
+  }
+  if (seedRows.some((seed) => seed.seed <= 4)) {
+    return {
+      label: "Measuring stick",
+      detail: "A high-seed team gets a regular-season proof point."
+    };
+  }
+  return {
+    label: "Season checkpoint",
+    detail: "Form, rotation choices, and standings momentum are on the line."
+  };
+}
+
+function scoutingSeedText(seed: StandingsSeed): string {
+  if (seed.seed <= 6) return `#${seed.seed} in the ${seed.conference}`;
+  if (seed.seed <= 10) return `#${seed.seed} in the ${seed.conference} play-in zone`;
+  return `#${seed.seed} in the ${seed.conference} chase`;
+}
+
+function recommendedCoachPlanForTeam({
+  teamId,
+  opponentId,
+  league,
+  teamStats,
+  playerStats,
+  offenseRank,
+  defenseRank,
+  reboundRank,
+  opponentOffenseRank,
+  opponentDefenseRank
+}: {
+  teamId: string;
+  opponentId: string;
+  league: LeagueState;
+  teamStats: Record<string, SeasonStatLine>;
+  playerStats: PlayerLeaderRow[];
+  offenseRank: number;
+  defenseRank: number;
+  reboundRank: number;
+  opponentOffenseRank: number;
+  opponentDefenseRank: number;
+}): { plan: CoachPlanPreset; reason: string } {
+  const teamCount = Math.max(1, league.teamIds.length);
+  const topThird = Math.ceil(teamCount / 3);
+  const lowerHalf = Math.ceil(teamCount / 2);
+  const teamLine = teamStats[teamId];
+  const opponentLine = teamStats[opponentId];
+  const teamGames = teamLine?.games ?? 0;
+  const hasTeamSample = teamGames > 0;
+  const hasOpponentSample = (opponentLine?.games ?? 0) > 0;
+  const leagueThreeAttempts = Object.values(teamStats).reduce((sum, line) => sum + (seasonLineValue(line, "3PA") ?? 0), 0);
+  const leagueFieldGoalAttempts = Object.values(teamStats).reduce((sum, line) => sum + (seasonLineValue(line, "FGA") ?? 0), 0);
+  const teamThreeAttempts = seasonLineValue(teamLine, "3PA") ?? 0;
+  const teamFieldGoalAttempts = seasonLineValue(teamLine, "FGA") ?? 0;
+  const leagueThreeRate = leagueRate(teamStats, "3PA", "FGA");
+  const leagueThreePct = leagueRate(teamStats, "3PM", "3PA");
+  const teamThreeRate = rate(teamThreeAttempts, teamFieldGoalAttempts);
+  const teamThreePct = rate(seasonLineValue(teamLine, "3PM"), teamThreeAttempts);
+  const teamPpg = teamStatPerGame(teamLine, "PTS");
+  const topScorer = playerStats
+    .filter((row) => row.teamId === teamId && row.games > 0)
+    .sort((a, b) => (b.perGame.PTS ?? 0) - (a.perGame.PTS ?? 0))[0];
+  const starShare = topScorer && teamPpg ? (topScorer.perGame.PTS ?? 0) / teamPpg : 0;
+  const hasThreeSample = teamFieldGoalAttempts > 0 && teamThreeAttempts > 0 && leagueFieldGoalAttempts > 0 && leagueThreeAttempts > 0;
+
+  if (!hasTeamSample) {
+    return {
+      plan: coachPresetById("balanced"),
+      reason: "No saved team results yet; start balanced until real tendencies emerge."
+    };
+  }
+  if (hasOpponentSample && opponentOffenseRank <= topThird && defenseRank > lowerHalf) {
+    return {
+      plan: coachPresetById("security"),
+      reason: "Opponent offense is elite; shortening empty possessions is the cleanest counter."
+    };
+  }
+  if (starShare >= 0.28 && topScorer) {
+    return {
+      plan: coachPresetById("star"),
+      reason: `${topScorer.player} carries enough scoring share to justify a star-led plan.`
+    };
+  }
+  if (hasThreeSample && teamThreeRate >= leagueThreeRate * 0.95 && teamThreePct >= leagueThreePct) {
+    return {
+      plan: coachPresetById("threes"),
+      reason: "Shot profile supports leaning into spacing and three-point volume."
+    };
+  }
+  if (reboundRank > lowerHalf) {
+    return {
+      plan: coachPresetById("glass"),
+      reason: "Board pressure can offset a weak rebounding profile."
+    };
+  }
+  if (hasOpponentSample && opponentDefenseRank > lowerHalf && offenseRank > topThird) {
+    return {
+      plan: coachPresetById("pressure"),
+      reason: "Attack a vulnerable defense and force whistle pressure."
+    };
+  }
+  return {
+    plan: coachPresetById("balanced"),
+    reason: `Base tendencies fit this matchup against ${opponentId}.`
+  };
+}
+
+function buildLeagueGameScoutingReport(
+  league: LeagueState,
+  game: ScheduledLeagueGame,
+  teamNames: Map<string, string>,
+  sourceTeamsById: Map<string, SourceTeamCatalogEntry>
+): LeagueGameScoutingReport {
+  const scheduledGames = scheduleLeagueGames(league);
+  const regularGames = scheduledGames.filter(isRegularSeasonGame);
+  const completedRegularPct = regularGames.length ? (regularGames.filter((scheduledGame) => scheduledGame.result).length / regularGames.length) * 100 : 0;
+  const beforeGames = completedGamesBefore(scheduledGames, game);
+  const rows = standings(league);
+  const rowsByTeamId = new Map(rows.map((row) => [row.teamId, row]));
+  const seedsByTeamId = conferenceSeedMap(rows, sourceTeamsById);
+  const teamStats = aggregateTeamStats(league);
+  const playerStats = aggregatePlayerStats(league);
+  const offenseRanks = teamRankMap(league.teamIds, (teamId) => (teamStats[teamId]?.games ? teamStatPerGame(teamStats[teamId], "PTS") : -Infinity), true);
+  const defenseRanks = teamRankMap(league.teamIds, (teamId) => {
+    const row = rowsByTeamId.get(teamId);
+    return row?.played ? row.pointsAgainst / row.played : Infinity;
+  }, false);
+  const reboundRanks = teamRankMap(league.teamIds, (teamId) => (teamStats[teamId]?.games ? teamStatPerGame(teamStats[teamId], "REB") : -Infinity), true);
+  const stakes = buildGameStakesLabel(game, seedsByTeamId, completedRegularPct, teamNames);
+  const headToHeadGames = beforeGames.filter((candidate) => teamsShareMatchup(candidate, game.awayTeamId, game.homeTeamId));
+  const awayHeadToHead = recordSummaryForGames(headToHeadGames, game.awayTeamId);
+  const lastHeadToHead = headToHeadGames.at(-1);
+  const awayOffenseRank = offenseRanks.get(game.awayTeamId) ?? league.teamIds.length;
+  const homeOffenseRank = offenseRanks.get(game.homeTeamId) ?? league.teamIds.length;
+  const awayDefenseRank = defenseRanks.get(game.awayTeamId) ?? league.teamIds.length;
+  const homeDefenseRank = defenseRanks.get(game.homeTeamId) ?? league.teamIds.length;
+  const planOptions = defaultLeagueMatchupOptions(league).gameplay?.teamPlans ?? {};
+  const teamCount = Math.max(1, league.teamIds.length);
+
+  const buildTeam = (teamId: string, opponentId: string, role: "Away" | "Home"): LeagueGameScoutingTeam => {
+    const completedTeamGames = beforeGames.filter((candidate) => candidate.awayTeamId === teamId || candidate.homeTeamId === teamId);
+    const recentGames = completedTeamGames.slice(-5);
+    const recent = recordSummaryForGames(recentGames, teamId);
+    const venueGames = beforeGames.filter((candidate) => (role === "Away" ? candidate.awayTeamId === teamId : candidate.homeTeamId === teamId));
+    const row = rowsByTeamId.get(teamId);
+    const offenseRank = offenseRanks.get(teamId) ?? teamCount;
+    const defenseRank = defenseRanks.get(teamId) ?? teamCount;
+    const recommendation = recommendedCoachPlanForTeam({
+      teamId,
+      opponentId,
+      league,
+      teamStats,
+      playerStats,
+      offenseRank,
+      defenseRank,
+      reboundRank: reboundRanks.get(teamId) ?? teamCount,
+      opponentOffenseRank: offenseRanks.get(opponentId) ?? teamCount,
+      opponentDefenseRank: defenseRanks.get(opponentId) ?? teamCount
+    });
+    return {
+      teamId,
+      role,
+      record: standingsRecordLabel(row),
+      seedLabel: scoutingSeedLabel(teamId, seedsByTeamId, sourceTeamsById),
+      formLabel: recent.played ? recent.label : "No recent games",
+      streak: streakForGames(completedTeamGames, teamId),
+      venueRecord: venueGames.length ? recordSummaryForGames(venueGames, teamId).label : "0-0",
+      offenseRank,
+      defenseRank,
+      ppg: row?.played ? round(row.pointsFor / row.played) : "-",
+      oppPpg: row?.played ? round(row.pointsAgainst / row.played) : "-",
+      plan: recommendation.plan,
+      planReason: recommendation.reason.replace(opponentId, teamLabel(teamNames, opponentId)),
+      activePlanId: activeCoachPresetId(planOptions[teamId])
+    };
+  };
+
+  return {
+    stakesLabel: stakes.label,
+    stakesDetail: stakes.detail,
+    headToHeadLabel: headToHeadGames.length ? `${teamLabel(teamNames, game.awayTeamId)} ${awayHeadToHead.label}` : "First meeting",
+    headToHeadDetail: lastHeadToHead ? `Last meeting: ${formatIsoDate(lastHeadToHead.date)} · ${gameScoreline(lastHeadToHead)}` : "No saved head-to-head result yet.",
+    styleLabel: `${teamLabel(teamNames, game.awayTeamId)} offense ${rankLabel(awayOffenseRank, teamCount)} vs ${teamLabel(teamNames, game.homeTeamId)} defense ${rankLabel(homeDefenseRank, teamCount)}`,
+    styleDetail: `${teamLabel(teamNames, game.homeTeamId)} offense ${rankLabel(homeOffenseRank, teamCount)} vs ${teamLabel(teamNames, game.awayTeamId)} defense ${rankLabel(awayDefenseRank, teamCount)}.`,
+    teams: [buildTeam(game.awayTeamId, game.homeTeamId, "Away"), buildTeam(game.homeTeamId, game.awayTeamId, "Home")]
+  };
 }
 
 function buildFocusTeamObjectives({
@@ -7697,7 +8553,8 @@ function LeagueGameInfoModal({
   onWatch,
   onManual,
   onSim,
-  onReset
+  onReset,
+  onApplyTeamPlan
 }: {
   game: ScheduledLeagueGame;
   league: LeagueState;
@@ -7711,6 +8568,7 @@ function LeagueGameInfoModal({
   onManual: () => void;
   onSim: () => void;
   onReset: () => void;
+  onApplyTeamPlan?: (teamId: string, plan: TeamGamePlanOptions) => void;
 }) {
   const [activeTeamCard, setActiveTeamCard] = useState<DiceTeamCard | null>(null);
   const [teamCardLoadingId, setTeamCardLoadingId] = useState<string | null>(null);
@@ -7725,6 +8583,8 @@ function LeagueGameInfoModal({
     return standingsRecordLabel(row);
   };
   const winnerLabel = game.result?.winnerTeamId && game.result.winnerTeamId !== "tie" ? teamLabel(teamNames, game.result.winnerTeamId) : game.result?.winnerTeamId === "tie" ? "Tie" : "-";
+  const scoutingReport = useMemo(() => buildLeagueGameScoutingReport(league, game, teamNames, sourceTeamsById), [game, league, sourceTeamsById, teamNames]);
+  const rivalryReport = useMemo(() => detectRivalrySignals(league, game, { teamNames }), [game, league, teamNames]);
 
   const openTeamCard = async (teamId: string) => {
     setTeamCardError(null);
@@ -7816,16 +8676,104 @@ function LeagueGameInfoModal({
           </div>
         </div>
 
-        {game.result && (
-          <section className="game-info-box-score result-panel">
-            <div className="team-card-section-title">
-              <h4>Full Box Score</h4>
-              <span>{game.result.source}</span>
+        <section className="game-scouting-panel">
+          <div className="team-card-section-title">
+            <h4>Scouting Report</h4>
+            <span>{scoutingReport.stakesLabel}</span>
+          </div>
+          <div className="game-scouting-summary">
+            <div>
+              <span>Stakes</span>
+              <strong>{scoutingReport.stakesLabel}</strong>
+              <small>{scoutingReport.stakesDetail}</small>
             </div>
-            {boxScoreError && <p className="form-error">{boxScoreError}</p>}
-            {!boxScoreError && !boxScoreTeams && <p className="empty-state">Loading full box score.</p>}
-            {boxScoreTeams && <GameResultContent result={game.result} away={boxScoreTeams.away} home={boxScoreTeams.home} showHeader={false} />}
-          </section>
+            <div>
+              <span>Head to head</span>
+              <strong>{scoutingReport.headToHeadLabel}</strong>
+              <small>{scoutingReport.headToHeadDetail}</small>
+            </div>
+            <div>
+              <span>Style clash</span>
+              <strong>{scoutingReport.styleLabel}</strong>
+              <small>{scoutingReport.styleDetail}</small>
+            </div>
+            <div>
+              <span>Rivalry signal</span>
+              <strong>{rivalryReport.upsetOpportunity?.label ?? rivalryReport.seedUpset?.label ?? rivalryReport.rematchLabel}</strong>
+              <small>{rivalryReport.notes[0] ?? rivalryReport.upsetOpportunity?.detail ?? "No rivalry wrinkle yet."}</small>
+            </div>
+          </div>
+          <div className="game-scouting-team-grid">
+            {scoutingReport.teams.map((team) => {
+              const samePlan = team.activePlanId === team.plan.id;
+              return (
+                <section key={team.teamId} className="game-scouting-team-card">
+                  <div className="game-scouting-team-title">
+                    <span>{team.role}</span>
+                    <TeamIdentityButton team={sourceTeamsById.get(team.teamId)} teamId={team.teamId} teamNames={teamNames} className="standings-team compact-team-identity" />
+                  </div>
+                  <div className="game-scouting-metrics">
+                    <div>
+                      <span>Record</span>
+                      <strong>{team.record}</strong>
+                    </div>
+                    <div>
+                      <span>Seed</span>
+                      <strong>{team.seedLabel}</strong>
+                    </div>
+                    <div>
+                      <span>Form</span>
+                      <strong>{team.formLabel}</strong>
+                    </div>
+                    <div>
+                      <span>{team.role === "Away" ? "Away" : "Home"}</span>
+                      <strong>{team.venueRecord}</strong>
+                    </div>
+                    <div>
+                      <span>Off / Def</span>
+                      <strong>
+                        #{team.offenseRank} / #{team.defenseRank}
+                      </strong>
+                    </div>
+                    <div>
+                      <span>PPG / OPP</span>
+                      <strong>
+                        {team.ppg} / {team.oppPpg}
+                      </strong>
+                    </div>
+                  </div>
+                  <div className="game-scouting-plan">
+                    <div>
+                      <span>Recommended plan</span>
+                      <strong>{team.plan.label}</strong>
+                      <small>{team.planReason}</small>
+                    </div>
+                    {!readOnly && onApplyTeamPlan && (
+                      <Button icon={<Target size={14} />} disabled={pending || samePlan} onClick={() => onApplyTeamPlan(team.teamId, team.plan.plan)}>
+                        {samePlan ? "Applied" : "Apply"}
+                      </Button>
+                    )}
+                  </div>
+                </section>
+              );
+            })}
+          </div>
+        </section>
+
+        {game.result && (
+          <>
+            <GameRecapPanel result={game.result} teamNames={teamNames} />
+            <GameSystemsAnalysisPanel result={game.result} teamNames={teamNames} />
+            <section className="game-info-box-score result-panel">
+              <div className="team-card-section-title">
+                <h4>Full Box Score</h4>
+                <span>{game.result.source}</span>
+              </div>
+              {boxScoreError && <p className="form-error">{boxScoreError}</p>}
+              {!boxScoreError && !boxScoreTeams && <p className="empty-state">Loading full box score.</p>}
+              {boxScoreTeams && <GameResultContent result={game.result} away={boxScoreTeams.away} home={boxScoreTeams.home} showHeader={false} />}
+            </section>
+          </>
         )}
 
         {!readOnly && (

@@ -3782,6 +3782,543 @@ tr:last-child td {
   min-width: 860px;
 }
 
+.league-game-systems-layout {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 14px;
+  align-items: start;
+  min-width: 0;
+}
+
+.league-game-systems-layout > * {
+  min-width: 0;
+}
+
+.league-system-panel {
+  grid-column: span 6;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  display: grid;
+  gap: 12px;
+  align-content: start;
+  min-width: 0;
+  padding: 12px;
+}
+
+.league-system-wide {
+  grid-column: 1 / -1;
+}
+
+.league-system-panel > header,
+.share-report-panel {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.league-system-panel > header > div,
+.share-report-panel > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.league-system-panel h3,
+.league-system-panel h4 {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.league-system-panel p {
+  color: var(--muted);
+  line-height: 1.35;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.league-system-panel :is(strong, b, span, small, p) {
+  min-width: 0;
+}
+
+.team-identity-grid,
+.fatigue-grid,
+.series-adjustment-grid,
+.league-newspaper-grid,
+.trophy-room-grid,
+.challenge-grid,
+.coach-grade-grid {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.team-identity-grid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.fatigue-grid,
+.series-adjustment-grid,
+.challenge-grid {
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+
+.league-newspaper-grid {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.trophy-room-grid {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.coach-grade-grid {
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.team-identity-card,
+.fatigue-card,
+.series-adjustment-card,
+.league-newspaper-story,
+.trophy-card,
+.challenge-card,
+.momentum-row,
+.win-prob-card,
+.coach-grade-card {
+  border: 1px solid #e1e7e4;
+  border-radius: 8px;
+  background: #ffffff;
+  color: inherit;
+  min-width: 0;
+}
+
+.team-identity-card,
+.fatigue-card,
+.series-adjustment-card,
+.league-newspaper-story,
+.trophy-card,
+.challenge-card,
+.win-prob-card,
+.coach-grade-card {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+}
+
+button.team-identity-card,
+button.fatigue-card,
+button.series-adjustment-card,
+button.league-newspaper-story,
+button.trophy-card,
+button.challenge-card,
+button.momentum-row,
+button.win-prob-card,
+button.coach-grade-card {
+  cursor: pointer;
+  text-align: left;
+}
+
+button.team-identity-card:hover,
+button.team-identity-card:focus-visible,
+button.fatigue-card:hover,
+button.fatigue-card:focus-visible,
+button.series-adjustment-card:hover,
+button.series-adjustment-card:focus-visible,
+button.league-newspaper-story:hover,
+button.league-newspaper-story:focus-visible,
+button.trophy-card:hover,
+button.trophy-card:focus-visible,
+button.challenge-card:hover,
+button.challenge-card:focus-visible,
+button.momentum-row:hover,
+button.momentum-row:focus-visible,
+button.win-prob-card:hover,
+button.win-prob-card:focus-visible,
+button.coach-grade-card:hover,
+button.coach-grade-card:focus-visible {
+  border-color: var(--teal);
+  box-shadow: 0 0 0 3px rgba(34, 108, 115, 0.1);
+}
+
+.team-identity-card.active,
+.challenge-card.complete,
+.coach-grade-card.positive,
+.momentum-row.positive {
+  border-color: #bed6c8;
+  background: #f1f8f4;
+}
+
+.fatigue-card.warning,
+.series-adjustment-card.warning,
+.challenge-card.warning,
+.momentum-row.warning {
+  border-color: #e9d3b4;
+  background: #fff8ec;
+}
+
+.fatigue-card.critical,
+.challenge-card.failed,
+.momentum-row.negative {
+  border-color: #e6c4c0;
+  background: #fff5f3;
+}
+
+.team-identity-card > span:first-child,
+.fatigue-card > span:first-child,
+.series-adjustment-card > span:first-child,
+.league-newspaper-story > span:first-child,
+.trophy-card > span:first-child,
+.challenge-card > span:first-child,
+.momentum-row > span:first-child,
+.win-prob-card > span:first-child,
+.coach-grade-card > span:first-child,
+.team-identity-meter label,
+.team-identity-meter > span:first-child {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.team-identity-card strong,
+.fatigue-card strong,
+.series-adjustment-card strong,
+.league-newspaper-story strong,
+.trophy-card strong,
+.challenge-card strong,
+.momentum-row strong,
+.win-prob-card strong,
+.coach-grade-card strong {
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.team-identity-card small,
+.fatigue-card small,
+.series-adjustment-card small,
+.trophy-card small,
+.challenge-card small,
+.momentum-row small,
+.win-prob-card small,
+.coach-grade-card small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.team-identity-card p,
+.fatigue-card p,
+.series-adjustment-card p,
+.challenge-card p,
+.league-newspaper-story p,
+.trophy-card p,
+.coach-grade-card p {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.team-identity-card header,
+.fatigue-card header,
+.series-adjustment-card header,
+.challenge-card header,
+.coach-grade-card header {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.team-identity-card header > span,
+.fatigue-card header > span,
+.series-adjustment-card header > span,
+.challenge-card header > span,
+.coach-grade-card header > span {
+  border-radius: 999px;
+  background: #edf3ef;
+  color: var(--green-dark);
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 850;
+  padding: 4px 8px;
+  white-space: nowrap;
+}
+
+.team-identity-meters {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.team-identity-empty {
+  border: 1px dashed #cfd9d3;
+  border-radius: 8px;
+  background: #f7faf8;
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px;
+}
+
+.team-identity-empty span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.team-identity-meter {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.team-identity-meter > span:first-child {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.team-identity-meter > span:first-child b {
+  color: var(--green-dark);
+  font-variant-numeric: tabular-nums;
+}
+
+.team-identity-meter-bar,
+.team-identity-meter-track,
+.challenge-progress,
+.win-prob-bar {
+  height: 7px;
+  border-radius: 999px;
+  background: #e7ece9;
+  overflow: hidden;
+}
+
+.team-identity-meter-fill,
+.team-identity-meter-bar > span,
+.team-identity-meter-track > span,
+.challenge-progress > span,
+.win-prob-bar > span {
+  display: block;
+  width: var(--meter-value, var(--progress, 50%));
+  max-width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--green);
+}
+
+.team-identity-meter.warning .team-identity-meter-fill,
+.team-identity-meter.warning .team-identity-meter-bar > span,
+.team-identity-meter.warning .team-identity-meter-track > span,
+.challenge-card.warning .challenge-progress > span {
+  background: var(--amber);
+}
+
+.team-identity-meter.critical .team-identity-meter-fill,
+.team-identity-meter.critical .team-identity-meter-bar > span,
+.team-identity-meter.critical .team-identity-meter-track > span,
+.fatigue-card.critical .team-identity-meter-fill {
+  background: var(--red);
+}
+
+.fatigue-card strong,
+.series-adjustment-card strong,
+.coach-grade-card strong {
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+.fatigue-card strong {
+  color: var(--teal);
+}
+
+.fatigue-card.warning strong,
+.series-adjustment-card.warning strong {
+  color: var(--amber);
+}
+
+.fatigue-card.critical strong {
+  color: var(--red);
+}
+
+.series-adjustment-card {
+  border-left: 3px solid var(--teal);
+}
+
+.series-adjustment-card.positive {
+  border-left-color: var(--green);
+}
+
+.series-adjustment-card.warning {
+  border-left-color: var(--amber);
+}
+
+.league-newspaper-story {
+  border-left: 3px solid var(--teal);
+  background: #fbfcfb;
+  align-content: start;
+}
+
+.league-newspaper-story.featured {
+  border-left-color: var(--green);
+  background: #f3f8f5;
+}
+
+.league-newspaper-story.breaking {
+  border-left-color: var(--amber);
+  background: #fff9f0;
+}
+
+.league-newspaper-story strong {
+  font-size: 15px;
+  line-height: 1.25;
+  white-space: normal;
+}
+
+.league-newspaper-story p {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+.trophy-card {
+  align-content: start;
+  justify-items: start;
+}
+
+.trophy-card > svg,
+.challenge-card > svg,
+.coach-grade-card > svg {
+  border-radius: 8px;
+  background: #e7f1eb;
+  color: var(--green-dark);
+  padding: 6px;
+}
+
+.trophy-card strong {
+  color: var(--green-dark);
+  font-size: 15px;
+}
+
+.challenge-card {
+  align-content: start;
+}
+
+.challenge-card.complete .challenge-progress > span {
+  background: var(--green);
+}
+
+.challenge-card.failed .challenge-progress > span {
+  background: var(--red);
+}
+
+.momentum-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 0.45fr);
+  gap: 10px;
+  align-items: start;
+  min-width: 0;
+}
+
+.momentum-grid > * {
+  min-width: 0;
+}
+
+.momentum-row {
+  display: grid;
+  grid-template-columns: minmax(92px, 0.34fr) minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 10px;
+}
+
+.momentum-row + .momentum-row {
+  margin-top: 7px;
+}
+
+.momentum-row b {
+  color: var(--green-dark);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.momentum-row.warning b {
+  color: var(--amber);
+}
+
+.momentum-row.negative b {
+  color: var(--red);
+}
+
+.win-prob-card {
+  border-left: 4px solid var(--teal);
+  background: #f8faf8;
+}
+
+.win-prob-card strong {
+  color: var(--teal);
+  font-size: 28px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.05;
+}
+
+.win-prob-card .win-prob-bar > span {
+  background: var(--teal);
+}
+
+.coach-grade-card {
+  border-top: 3px solid var(--teal);
+}
+
+.coach-grade-card strong {
+  color: var(--green-dark);
+}
+
+.coach-grade-card.grade-a,
+.coach-grade-card.grade-b {
+  border-top-color: var(--green);
+}
+
+.coach-grade-card.grade-c {
+  border-top-color: var(--amber);
+}
+
+.coach-grade-card.grade-d,
+.coach-grade-card.grade-f {
+  border-top-color: var(--red);
+}
+
+.share-report-panel {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8faf8;
+  padding: 12px;
+}
+
+.share-report-panel h4 {
+  margin: 0;
+}
+
+.share-report-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
 .season-builder-layout {
   display: grid;
   grid-template-columns: minmax(360px, 0.9fr) minmax(360px, 1.1fr);
@@ -4980,6 +5517,239 @@ tr:last-child td {
   min-width: 0;
 }
 
+.game-scouting-panel {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfb;
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+}
+
+.game-scouting-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+}
+
+.game-scouting-summary > div,
+.game-scouting-team-card {
+  border: 1px solid #e1e7e4;
+  border-radius: 8px;
+  background: #ffffff;
+  min-width: 0;
+}
+
+.game-scouting-summary > div {
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+}
+
+.game-scouting-summary span,
+.game-scouting-team-title > span,
+.game-scouting-metrics span,
+.game-scouting-plan span {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.game-scouting-summary strong,
+.game-scouting-summary small,
+.game-scouting-plan strong,
+.game-scouting-plan small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.game-scouting-summary strong,
+.game-scouting-plan strong {
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.game-scouting-summary small,
+.game-scouting-plan small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.game-scouting-team-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.game-scouting-team-card {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+}
+
+.game-scouting-team-title {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.game-scouting-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.game-scouting-metrics > div {
+  border: 1px solid #edf1ef;
+  border-radius: 8px;
+  background: #f8faf8;
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 8px;
+}
+
+.game-scouting-metrics strong {
+  color: var(--green-dark);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.game-scouting-plan {
+  border-top: 1px solid #edf1ef;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+  padding-top: 10px;
+}
+
+.game-scouting-plan > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.game-recap-panel {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+}
+
+.game-recap-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+  gap: 10px;
+}
+
+.game-recap-hero > div {
+  border: 1px solid #e1e7e4;
+  border-radius: 8px;
+  background: #f8faf8;
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px;
+}
+
+.game-recap-hero span,
+.game-recap-row > span:first-child,
+.game-recap-grid h5 {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.game-recap-hero strong {
+  color: var(--green-dark);
+  font-size: 17px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.game-recap-hero small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.game-recap-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.game-recap-grid section {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.game-recap-grid h5 {
+  margin: 0;
+}
+
+.game-recap-list {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.game-recap-row {
+  border: 1px solid #e1e7e4;
+  border-radius: 8px;
+  background: #fbfcfb;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(100px, 0.46fr) minmax(130px, 0.6fr);
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  padding: 8px 10px;
+}
+
+.game-recap-row.factor {
+  grid-template-columns: minmax(92px, 0.42fr) minmax(0, 1fr) minmax(120px, 0.65fr);
+}
+
+.game-recap-row > span,
+.game-recap-row strong,
+.game-recap-row small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.game-recap-row > span:not(:first-child),
+.game-recap-row small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.game-recap-row strong {
+  color: var(--ink);
+  font-size: 13px;
+}
+
 .game-info-box-score {
   border-top: 1px solid var(--line);
   padding-top: 12px;
@@ -5474,18 +6244,30 @@ tr:last-child td {
   .league-hq-hero,
   .league-complete-banner,
   .league-history-hero,
-  .league-team-detail-grid {
+  .league-team-detail-grid,
+  .league-game-systems-layout,
+  .momentum-grid {
     grid-template-columns: 1fr;
   }
 
   .league-hq-feature,
   .league-hq-panel,
   .league-history-champion,
-  .league-history-panel {
+  .league-history-panel,
+  .league-system-panel {
     grid-column: 1 / -1;
   }
 
   .league-advance-actions {
+    justify-content: flex-start;
+  }
+
+  .share-report-panel {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .share-report-actions {
     justify-content: flex-start;
   }
 
@@ -5702,7 +6484,28 @@ tr:last-child td {
   }
 
   .league-team-hero,
-  .league-team-game-row {
+  .league-team-game-row,
+  .team-identity-card header,
+  .fatigue-card header,
+  .series-adjustment-card header,
+  .challenge-card header,
+  .coach-grade-card header,
+  .momentum-row {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .league-system-panel > header {
+    display: grid;
+  }
+
+  .team-identity-grid,
+  .fatigue-grid,
+  .series-adjustment-grid,
+  .league-newspaper-grid,
+  .trophy-room-grid,
+  .challenge-grid,
+  .coach-grade-grid {
     grid-template-columns: 1fr;
   }
 
@@ -5719,6 +6522,10 @@ tr:last-child td {
   }
 
   .league-complete-status h3 {
+    font-size: 22px;
+  }
+
+  .win-prob-card strong {
     font-size: 22px;
   }
 
@@ -5757,7 +6564,21 @@ tr:last-child td {
   }
 
   .game-info-matchup,
-  .game-info-detail-grid {
+  .game-info-detail-grid,
+  .game-scouting-summary,
+  .game-scouting-team-grid,
+  .game-recap-hero,
+  .game-recap-grid,
+  .game-recap-row,
+  .game-recap-row.factor {
+    grid-template-columns: 1fr;
+  }
+
+  .game-scouting-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .game-scouting-plan {
     grid-template-columns: 1fr;
   }
 
