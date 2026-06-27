@@ -1,4 +1,4 @@
-import { simulateGame } from "./diceEngine";
+import { normalizeMatchupOptions, simulateGame } from "./diceEngine";
 import type {
   DiceTeamCard,
   GameResult,
@@ -57,6 +57,7 @@ export function createTournament(name: string, teamIds: string[]): LeagueState {
     name,
     teamIds,
     games,
+    matchupOptions: normalizeMatchupOptions(),
     createdAt: now,
     updatedAt: now
   };
@@ -326,6 +327,7 @@ export function createSeasonLeague(name: string, teamIds: string[], gamesPerTeam
     name,
     teamIds: teams,
     games: assignSeasonDates(games, seasonStartDate),
+    matchupOptions: normalizeMatchupOptions(),
     currentDate: seasonStartDate,
     focusTeamId: teams[0],
     createdAt: now,
@@ -992,6 +994,14 @@ export function renameLeague(league: LeagueState, name: string): LeagueState {
   return {
     ...league,
     name: trimmedName || league.name,
+    updatedAt: new Date().toISOString()
+  };
+}
+
+export function setLeagueMatchupOptions(league: LeagueState, options: Partial<MatchupOptions>): LeagueState {
+  return {
+    ...league,
+    matchupOptions: normalizeMatchupOptions(options),
     updatedAt: new Date().toISOString()
   };
 }

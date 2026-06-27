@@ -1232,6 +1232,113 @@ a {
   align-items: center;
 }
 
+.matchup-options-stack {
+  display: grid;
+  gap: 10px;
+}
+
+.era-slider-control,
+.era-number-control {
+  display: grid;
+  grid-template-columns: auto minmax(120px, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.era-number-control {
+  grid-template-columns: auto 96px;
+}
+
+.era-slider-control input[type="range"] {
+  min-height: 28px;
+  padding: 0;
+}
+
+.era-slider-control b {
+  color: var(--ink);
+  font-size: 12px;
+  min-width: 34px;
+  text-align: right;
+}
+
+.game-plan-controls {
+  border: 1px solid var(--line);
+  background: var(--panel-soft);
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  padding: 10px 12px;
+}
+
+.game-plan-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.tempo-control {
+  flex: 1 1 260px;
+}
+
+.game-plan-team {
+  border-top: 1px solid var(--line);
+  display: grid;
+  grid-template-columns: minmax(140px, 0.7fr) repeat(5, minmax(120px, 1fr));
+  gap: 10px;
+  padding-top: 10px;
+  align-items: center;
+}
+
+.game-plan-team-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.game-plan-team-title span {
+  display: grid;
+  min-width: 0;
+}
+
+.game-plan-team-title strong,
+.game-plan-team-title small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.game-plan-team-title small {
+  color: var(--muted);
+}
+
+.expected-line-panel {
+  display: grid;
+  gap: 2px;
+}
+
+.expected-line-metrics {
+  margin-bottom: 8px;
+}
+
+.expected-player-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.expected-player-table {
+  min-width: 0;
+}
+
+.expected-player-table table {
+  min-width: 760px;
+}
+
 .setup-panel {
   padding: 0;
   overflow: hidden;
@@ -3498,7 +3605,7 @@ tr:last-child td {
   min-width: 0;
 }
 
-.postseason-seed-list span,
+.postseason-seed-list > span,
 .postseason-team-row {
   display: grid;
   grid-template-columns: 28px minmax(0, 1fr) auto auto;
@@ -3639,19 +3746,41 @@ tr:last-child td {
 .bracket-team-line {
   display: grid;
   grid-template-columns: 24px 24px minmax(0, 1fr) auto;
-  gap: 7px;
+  gap: 6px;
   align-items: center;
+  min-height: 30px;
   min-width: 0;
 }
 
-.bracket-team-line strong,
+.bracket-team-copy {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.bracket-team-copy strong,
+.bracket-team-copy small,
 .bracket-series-card small {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.bracket-team-line.winner strong,
+.bracket-team-copy strong {
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 850;
+  line-height: 1.1;
+}
+
+.bracket-team-copy small {
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 750;
+  line-height: 1;
+}
+
+.bracket-team-line.winner .bracket-team-copy strong,
 .bracket-team-line.winner b {
   color: var(--green-dark);
 }
@@ -4497,6 +4626,10 @@ tr:last-child td {
   .possession-layout {
     grid-template-columns: 1fr;
   }
+
+  .game-plan-team {
+    grid-template-columns: minmax(180px, 0.8fr) repeat(2, minmax(150px, 1fr));
+  }
 }
 
 @media (max-width: 980px) {
@@ -4679,6 +4812,18 @@ tr:last-child td {
     grid-template-columns: 1fr;
   }
 
+  .expected-player-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .game-plan-header {
+    display: grid;
+  }
+
+  .game-plan-team {
+    grid-template-columns: 1fr;
+  }
+
   .options-bar {
     align-items: stretch;
   }
@@ -4700,6 +4845,15 @@ tr:last-child td {
   .segmented,
   .segment-buttons {
     width: 100%;
+  }
+
+  .era-slider-control,
+  .era-number-control {
+    width: 100%;
+  }
+
+  .era-slider-control {
+    grid-template-columns: auto minmax(0, 1fr) auto;
   }
 
   .segment-buttons button {

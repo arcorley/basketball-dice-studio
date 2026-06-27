@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
-import { buildMatchupCard, summarizeSimulations } from "../src/lib/diceEngine";
-import type { DicePlayerCard, DiceTeamCard, MatchupOptions, ShotZone, StatLine, TeamMatchupStatic } from "../src/lib/types";
+import { buildExpectedMatchupLine, buildMatchupCard, crossEraModelVersion, summarizeSimulations } from "../src/lib/diceEngine";
+import type { DicePlayerCard, DiceTeamCard, ExpectedTeamLine, MatchupOptions, ShotZone, StatLine, TeamMatchupStatic } from "../src/lib/types";
 import { getDiceTeams, getTeam } from "./sourceDataStatic";
 
 type NumericRange = {
@@ -209,6 +209,21 @@ function simTeamLine(line: StatLine): TeamBoxScore {
   };
 }
 
+function expectedTeamBox(line: ExpectedTeamLine): TeamBoxScore {
+  return {
+    pts: fixed(line.pts, 1),
+    fga: fixed(line.fga, 1),
+    fgPct: fixed(line.fgPct, 3),
+    threePa: fixed(line.threePa, 1),
+    threePct: fixed(line.threePct, 3),
+    fta: fixed(line.fta, 1),
+    ftPct: fixed(line.ftPct, 3),
+    tov: fixed(line.tov, 1),
+    orb: fixed(line.orb, 1),
+    poss: fixed(line.possessions, 1)
+  };
+}
+
 function boxDelta(sim: TeamBoxScore, source: TeamBoxScore): TeamBoxScore {
   return {
     pts: fixed(sim.pts - source.pts, 1),
@@ -350,6 +365,7 @@ function runMatchup(check: MatchupCheck, index: number) {
   const away = getTeam(check.awayId);
   const home = getTeam(check.homeId);
   const matchup = buildMatchupCard(away, home);
+  const expected = buildExpectedMatchupLine(away, home);
   const staticFailures = checkStaticMatchupFields(matchup);
   const summary = summarizeSimulations(away, home, iterations, seed + index * 100_000);
   const ties = summary.wins.tie ?? 0;
@@ -371,9 +387,13 @@ function runMatchup(check: MatchupCheck, index: number) {
     },
     overtimeRate: pct((summary.overtimeGames ?? 0) / iterations),
     averageMarginForAway: fixed(summary.teams[away.id].PTS - summary.teams[home.id].PTS, 1),
+    expectedMarginForAway: fixed(expected.marginForAway, 1),
+    simMinusExpectedMarginForAway: fixed(summary.teams[away.id].PTS - summary.teams[home.id].PTS - expected.marginForAway, 1),
     staticFailures,
     teams: [away, home].map((team) => {
       const sim = simTeamLine(summary.teams[team.id]);
+      const expectedTeam = team.id === away.id ? expected.away : expected.home;
+      const expectedBox = expectedTeamBox(expectedTeam);
       const source = sourceTeamLine(team, matchup.possessionsEach);
       return {
         teamId: team.id,
@@ -387,8 +407,11 @@ function runMatchup(check: MatchupCheck, index: number) {
           threeTendency: fixed(team.threeTendency, 2)
         },
         sim,
+        expected: expectedBox,
         paceAdjustedSource: source,
-        delta: boxDelta(sim, source)
+        delta: boxDelta(sim, source),
+        expectedDelta: boxDelta(expectedBox, source),
+        simMinusExpected: boxDelta(sim, expectedBox)
       };
     })
   };
@@ -422,6 +445,7 @@ const contextSmoke = runContextSmokeChecks();
 const report = {
   generatedAt: new Date().toISOString(),
   run: {
+    modelVersion: crossEraModelVersion,
     iterations,
     seed,
     matchupCount: matchups.length,
@@ -447,14 +471,18 @@ for (const result of matchupResults) {
   const homeRate = result.winRates[result.homeId];
   console.log(
     `${result.label}: ${result.away} ${awayRate}% at ${result.home} ${homeRate}% ` +
-      `(avg margin away ${result.averageMarginForAway > 0 ? "+" : ""}${result.averageMarginForAway})`
+      `(avg margin away ${result.averageMarginForAway > 0 ? "+" : ""}${result.averageMarginForAway}, ` +
+      `expected ${result.expectedMarginForAway > 0 ? "+" : ""}${result.expectedMarginForAway}, ` +
+      `sim-exp ${result.simMinusExpectedMarginForAway > 0 ? "+" : ""}${result.simMinusExpectedMarginForAway})`
   );
   for (const team of result.teams) {
     const delta = team.delta;
+    const simMinusExpected = team.simMinusExpected;
     console.log(
       `  ${team.team}: delta pts ${delta.pts > 0 ? "+" : ""}${delta.pts}, ` +
         `FGA ${delta.fga > 0 ? "+" : ""}${delta.fga}, 3PA ${delta.threePa > 0 ? "+" : ""}${delta.threePa}, ` +
-        `FTA ${delta.fta > 0 ? "+" : ""}${delta.fta}, TOV ${delta.tov > 0 ? "+" : ""}${delta.tov}, ORB ${delta.orb > 0 ? "+" : ""}${delta.orb}`
+        `FTA ${delta.fta > 0 ? "+" : ""}${delta.fta}, TOV ${delta.tov > 0 ? "+" : ""}${delta.tov}, ORB ${delta.orb > 0 ? "+" : ""}${delta.orb}; ` +
+        `sim-exp pts ${simMinusExpected.pts > 0 ? "+" : ""}${simMinusExpected.pts}, FGA ${simMinusExpected.fga > 0 ? "+" : ""}${simMinusExpected.fga}`
     );
   }
 }

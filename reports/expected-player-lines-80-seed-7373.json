@@ -1,0 +1,3934 @@
+{
+  "generatedAt": "2026-06-27T01:18:45.148Z",
+  "run": {
+    "modelVersion": "cross-era-midpoint-v1",
+    "seed": 7373,
+    "pairs": 80,
+    "tolerance": 0.01,
+    "elapsedSeconds": 0.2
+  },
+  "status": "pass",
+  "failures": [],
+  "checks": [
+    {
+      "awayId": "1992-93-nyk",
+      "homeId": "1990-91-lal",
+      "away": "1992-93 Knicks",
+      "home": "1990-91 Lakers",
+      "awaySeason": 1993,
+      "homeSeason": 1991,
+      "eraGap": 2,
+      "teams": [
+        {
+          "teamId": "1992-93-nyk",
+          "team": "1992-93 Knicks",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "1990-91-lal",
+          "team": "1990-91 Lakers",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "1995-96-pho",
+      "homeId": "2010-11-njn",
+      "away": "1995-96 Suns",
+      "home": "2010-11 Nets",
+      "awaySeason": 1996,
+      "homeSeason": 2011,
+      "eraGap": 15,
+      "teams": [
+        {
+          "teamId": "1995-96-pho",
+          "team": "1995-96 Suns",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2010-11-njn",
+          "team": "2010-11 Nets",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "1998-99-chi",
+      "homeId": "2007-08-det",
+      "away": "1998-99 Bulls",
+      "home": "2007-08 Pistons",
+      "awaySeason": 1999,
+      "homeSeason": 2008,
+      "eraGap": 9,
+      "teams": [
+        {
+          "teamId": "1998-99-chi",
+          "team": "1998-99 Bulls",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2007-08-det",
+          "team": "2007-08 Pistons",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "2003-04-den",
+      "homeId": "2005-06-dal",
+      "away": "2003-04 Nuggets",
+      "home": "2005-06 Mavericks",
+      "awaySeason": 2004,
+      "homeSeason": 2006,
+      "eraGap": 2,
+      "teams": [
+        {
+          "teamId": "2003-04-den",
+          "team": "2003-04 Nuggets",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2005-06-dal",
+          "team": "2005-06 Mavericks",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "1999-00-atl",
+      "homeId": "1994-95-sac",
+      "away": "1999-00 Hawks",
+      "home": "1994-95 Kings",
+      "awaySeason": 2000,
+      "homeSeason": 1995,
+      "eraGap": 5,
+      "teams": [
+        {
+          "teamId": "1999-00-atl",
+          "team": "1999-00 Hawks",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "1994-95-sac",
+          "team": "1994-95 Kings",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "1993-94-mil",
+      "homeId": "2020-21-atl",
+      "away": "1993-94 Bucks",
+      "home": "2020-21 Hawks",
+      "awaySeason": 1994,
+      "homeSeason": 2021,
+      "eraGap": 27,
+      "teams": [
+        {
+          "teamId": "1993-94-mil",
+          "team": "1993-94 Bucks",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2020-21-atl",
+          "team": "2020-21 Hawks",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "1989-90-lal",
+      "homeId": "2012-13-den",
+      "away": "1989-90 Lakers",
+      "home": "2012-13 Nuggets",
+      "awaySeason": 1990,
+      "homeSeason": 2013,
+      "eraGap": 23,
+      "teams": [
+        {
+          "teamId": "1989-90-lal",
+          "team": "1989-90 Lakers",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2012-13-den",
+          "team": "2012-13 Nuggets",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "2006-07-atl",
+      "homeId": "1990-91-hou",
+      "away": "2006-07 Hawks",
+      "home": "1990-91 Rockets",
+      "awaySeason": 2007,
+      "homeSeason": 1991,
+      "eraGap": 16,
+      "teams": [
+        {
+          "teamId": "2006-07-atl",
+          "team": "2006-07 Hawks",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "1990-91-hou",
+          "team": "1990-91 Rockets",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "2021-22-was",
+      "homeId": "2003-04-ind",
+      "away": "2021-22 Wizards",
+      "home": "2003-04 Pacers",
+      "awaySeason": 2022,
+      "homeSeason": 2004,
+      "eraGap": 18,
+      "teams": [
+        {
+          "teamId": "2021-22-was",
+          "team": "2021-22 Wizards",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2003-04-ind",
+          "team": "2003-04 Pacers",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "2019-20-min",
+      "homeId": "2020-21-phi",
+      "away": "2019-20 Timberwolves",
+      "home": "2020-21 76ers",
+      "awaySeason": 2020,
+      "homeSeason": 2021,
+      "eraGap": 1,
+      "teams": [
+        {
+          "teamId": "2019-20-min",
+          "team": "2019-20 Timberwolves",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2020-21-phi",
+          "team": "2020-21 76ers",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "2021-22-por",
+      "homeId": "1999-00-min",
+      "away": "2021-22 Trail Blazers",
+      "home": "1999-00 Timberwolves",
+      "awaySeason": 2022,
+      "homeSeason": 2000,
+      "eraGap": 22,
+      "teams": [
+        {
+          "teamId": "2021-22-por",
+          "team": "2021-22 Trail Blazers",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "1999-00-min",
+          "team": "1999-00 Timberwolves",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "1990-91-atl",
+      "homeId": "2023-24-nop",
+      "away": "1990-91 Hawks",
+      "home": "2023-24 Pelicans",
+      "awaySeason": 1991,
+      "homeSeason": 2024,
+      "eraGap": 33,
+      "teams": [
+        {
+          "teamId": "1990-91-atl",
+          "team": "1990-91 Hawks",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2023-24-nop",
+          "team": "2023-24 Pelicans",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "2010-11-mem",
+      "homeId": "2015-16-por",
+      "away": "2010-11 Grizzlies",
+      "home": "2015-16 Trail Blazers",
+      "awaySeason": 2011,
+      "homeSeason": 2016,
+      "eraGap": 5,
+      "teams": [
+        {
+          "teamId": "2010-11-mem",
+          "team": "2010-11 Grizzlies",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2015-16-por",
+          "team": "2015-16 Trail Blazers",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "2018-19-phi",
+      "homeId": "1998-99-sac",
+      "away": "2018-19 76ers",
+      "home": "1998-99 Kings",
+      "awaySeason": 2019,
+      "homeSeason": 1999,
+      "eraGap": 20,
+      "teams": [
+        {
+          "teamId": "2018-19-phi",
+          "team": "2018-19 76ers",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "1998-99-sac",
+          "team": "1998-99 Kings",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "2007-08-lal",
+      "homeId": "2010-11-chi",
+      "away": "2007-08 Lakers",
+      "home": "2010-11 Bulls",
+      "awaySeason": 2008,
+      "homeSeason": 2011,
+      "eraGap": 3,
+      "teams": [
+        {
+          "teamId": "2007-08-lal",
+          "team": "2007-08 Lakers",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2010-11-chi",
+          "team": "2010-11 Bulls",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "2016-17-brk",
+      "homeId": "2015-16-sac",
+      "away": "2016-17 Nets",
+      "home": "2015-16 Kings",
+      "awaySeason": 2017,
+      "homeSeason": 2016,
+      "eraGap": 1,
+      "teams": [
+        {
+          "teamId": "2016-17-brk",
+          "team": "2016-17 Nets",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2015-16-sac",
+          "team": "2015-16 Kings",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "2020-21-mil",
+      "homeId": "2000-01-nyk",
+      "away": "2020-21 Bucks",
+      "home": "2000-01 Knicks",
+      "awaySeason": 2021,
+      "homeSeason": 2001,
+      "eraGap": 20,
+      "teams": [
+        {
+          "teamId": "2020-21-mil",
+          "team": "2020-21 Bucks",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2000-01-nyk",
+          "team": "2000-01 Knicks",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "2019-20-atl",
+      "homeId": "1991-92-chh",
+      "away": "2019-20 Hawks",
+      "home": "1991-92 Hornets",
+      "awaySeason": 2020,
+      "homeSeason": 1992,
+      "eraGap": 28,
+      "teams": [
+        {
+          "teamId": "2019-20-atl",
+          "team": "2019-20 Hawks",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "1991-92-chh",
+          "team": "1991-92 Hornets",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "1994-95-bos",
+      "homeId": "2017-18-min",
+      "away": "1994-95 Celtics",
+      "home": "2017-18 Timberwolves",
+      "awaySeason": 1995,
+      "homeSeason": 2018,
+      "eraGap": 23,
+      "teams": [
+        {
+          "teamId": "1994-95-bos",
+          "team": "1994-95 Celtics",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2017-18-min",
+          "team": "2017-18 Timberwolves",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "1997-98-njn",
+      "homeId": "2019-20-det",
+      "away": "1997-98 Nets",
+      "home": "2019-20 Pistons",
+      "awaySeason": 1998,
+      "homeSeason": 2020,
+      "eraGap": 22,
+      "teams": [
+        {
+          "teamId": "1997-98-njn",
+          "team": "1997-98 Nets",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2019-20-det",
+          "team": "2019-20 Pistons",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "2023-24-mia",
+      "homeId": "2000-01-sea",
+      "away": "2023-24 Heat",
+      "home": "2000-01 SuperSonics",
+      "awaySeason": 2024,
+      "homeSeason": 2001,
+      "eraGap": 23,
+      "teams": [
+        {
+          "teamId": "2023-24-mia",
+          "team": "2023-24 Heat",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2000-01-sea",
+          "team": "2000-01 SuperSonics",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "2004-05-lac",
+      "homeId": "2003-04-sas",
+      "away": "2004-05 Clippers",
+      "home": "2003-04 Spurs",
+      "awaySeason": 2005,
+      "homeSeason": 2004,
+      "eraGap": 1,
+      "teams": [
+        {
+          "teamId": "2004-05-lac",
+          "team": "2004-05 Clippers",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2003-04-sas",
+          "team": "2003-04 Spurs",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "2020-21-mil",
+      "homeId": "2010-11-orl",
+      "away": "2020-21 Bucks",
+      "home": "2010-11 Magic",
+      "awaySeason": 2021,
+      "homeSeason": 2011,
+      "eraGap": 10,
+      "teams": [
+        {
+          "teamId": "2020-21-mil",
+          "team": "2020-21 Bucks",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2010-11-orl",
+          "team": "2010-11 Magic",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "1992-93-sac",
+      "homeId": "2018-19-dal",
+      "away": "1992-93 Kings",
+      "home": "2018-19 Mavericks",
+      "awaySeason": 1993,
+      "homeSeason": 2019,
+      "eraGap": 26,
+      "teams": [
+        {
+          "teamId": "1992-93-sac",
+          "team": "1992-93 Kings",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2018-19-dal",
+          "team": "2018-19 Mavericks",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "2006-07-den",
+      "homeId": "1996-97-sas",
+      "away": "2006-07 Nuggets",
+      "home": "1996-97 Spurs",
+      "awaySeason": 2007,
+      "homeSeason": 1997,
+      "eraGap": 10,
+      "teams": [
+        {
+          "teamId": "2006-07-den",
+          "team": "2006-07 Nuggets",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "1996-97-sas",
+          "team": "1996-97 Spurs",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "1993-94-mia",
+      "homeId": "2012-13-was",
+      "away": "1993-94 Heat",
+      "home": "2012-13 Wizards",
+      "awaySeason": 1994,
+      "homeSeason": 2013,
+      "eraGap": 19,
+      "teams": [
+        {
+          "teamId": "1993-94-mia",
+          "team": "1993-94 Heat",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2012-13-was",
+          "team": "2012-13 Wizards",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "2017-18-nyk",
+      "homeId": "2006-07-cha",
+      "away": "2017-18 Knicks",
+      "home": "2006-07 Bobcats",
+      "awaySeason": 2018,
+      "homeSeason": 2007,
+      "eraGap": 11,
+      "teams": [
+        {
+          "teamId": "2017-18-nyk",
+          "team": "2017-18 Knicks",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2006-07-cha",
+          "team": "2006-07 Bobcats",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "2022-23-mem",
+      "homeId": "2024-25-okc",
+      "away": "2022-23 Grizzlies",
+      "home": "2024-25 Thunder",
+      "awaySeason": 2023,
+      "homeSeason": 2025,
+      "eraGap": 2,
+      "teams": [
+        {
+          "teamId": "2022-23-mem",
+          "team": "2022-23 Grizzlies",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2024-25-okc",
+          "team": "2024-25 Thunder",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "2011-12-sac",
+      "homeId": "2018-19-bos",
+      "away": "2011-12 Kings",
+      "home": "2018-19 Celtics",
+      "awaySeason": 2012,
+      "homeSeason": 2019,
+      "eraGap": 7,
+      "teams": [
+        {
+          "teamId": "2011-12-sac",
+          "team": "2011-12 Kings",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2018-19-bos",
+          "team": "2018-19 Celtics",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "2008-09-tor",
+      "homeId": "1996-97-bos",
+      "away": "2008-09 Raptors",
+      "home": "1996-97 Celtics",
+      "awaySeason": 2009,
+      "homeSeason": 1997,
+      "eraGap": 12,
+      "teams": [
+        {
+          "teamId": "2008-09-tor",
+          "team": "2008-09 Raptors",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "1996-97-bos",
+          "team": "1996-97 Celtics",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "2007-08-mil",
+      "homeId": "1992-93-sas",
+      "away": "2007-08 Bucks",
+      "home": "1992-93 Spurs",
+      "awaySeason": 2008,
+      "homeSeason": 1993,
+      "eraGap": 15,
+      "teams": [
+        {
+          "teamId": "2007-08-mil",
+          "team": "2007-08 Bucks",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "1992-93-sas",
+          "team": "1992-93 Spurs",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "2022-23-cle",
+      "homeId": "2017-18-mia",
+      "away": "2022-23 Cavaliers",
+      "home": "2017-18 Heat",
+      "awaySeason": 2023,
+      "homeSeason": 2018,
+      "eraGap": 5,
+      "teams": [
+        {
+          "teamId": "2022-23-cle",
+          "team": "2022-23 Cavaliers",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2017-18-mia",
+          "team": "2017-18 Heat",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "2016-17-nyk",
+      "homeId": "2008-09-sac",
+      "away": "2016-17 Knicks",
+      "home": "2008-09 Kings",
+      "awaySeason": 2017,
+      "homeSeason": 2009,
+      "eraGap": 8,
+      "teams": [
+        {
+          "teamId": "2016-17-nyk",
+          "team": "2016-17 Knicks",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2008-09-sac",
+          "team": "2008-09 Kings",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "1997-98-lal",
+      "homeId": "2010-11-uta",
+      "away": "1997-98 Lakers",
+      "home": "2010-11 Jazz",
+      "awaySeason": 1998,
+      "homeSeason": 2011,
+      "eraGap": 13,
+      "teams": [
+        {
+          "teamId": "1997-98-lal",
+          "team": "1997-98 Lakers",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2010-11-uta",
+          "team": "2010-11 Jazz",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "1991-92-phi",
+      "homeId": "2023-24-gsw",
+      "away": "1991-92 76ers",
+      "home": "2023-24 Warriors",
+      "awaySeason": 1992,
+      "homeSeason": 2024,
+      "eraGap": 32,
+      "teams": [
+        {
+          "teamId": "1991-92-phi",
+          "team": "1991-92 76ers",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2023-24-gsw",
+          "team": "2023-24 Warriors",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "2005-06-mem",
+      "homeId": "2006-07-por",
+      "away": "2005-06 Grizzlies",
+      "home": "2006-07 Trail Blazers",
+      "awaySeason": 2006,
+      "homeSeason": 2007,
+      "eraGap": 1,
+      "teams": [
+        {
+          "teamId": "2005-06-mem",
+          "team": "2005-06 Grizzlies",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2006-07-por",
+          "team": "2006-07 Trail Blazers",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "1991-92-sas",
+      "homeId": "2015-16-nop",
+      "away": "1991-92 Spurs",
+      "home": "2015-16 Pelicans",
+      "awaySeason": 1992,
+      "homeSeason": 2016,
+      "eraGap": 24,
+      "teams": [
+        {
+          "teamId": "1991-92-sas",
+          "team": "1991-92 Spurs",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2015-16-nop",
+          "team": "2015-16 Pelicans",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "2000-01-chh",
+      "homeId": "2013-14-lal",
+      "away": "2000-01 Hornets",
+      "home": "2013-14 Lakers",
+      "awaySeason": 2001,
+      "homeSeason": 2014,
+      "eraGap": 13,
+      "teams": [
+        {
+          "teamId": "2000-01-chh",
+          "team": "2000-01 Hornets",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2013-14-lal",
+          "team": "2013-14 Lakers",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "1996-97-njn",
+      "homeId": "2016-17-nop",
+      "away": "1996-97 Nets",
+      "home": "2016-17 Pelicans",
+      "awaySeason": 1997,
+      "homeSeason": 2017,
+      "eraGap": 20,
+      "teams": [
+        {
+          "teamId": "1996-97-njn",
+          "team": "1996-97 Nets",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2016-17-nop",
+          "team": "2016-17 Pelicans",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "2003-04-bos",
+      "homeId": "2012-13-hou",
+      "away": "2003-04 Celtics",
+      "home": "2012-13 Rockets",
+      "awaySeason": 2004,
+      "homeSeason": 2013,
+      "eraGap": 9,
+      "teams": [
+        {
+          "teamId": "2003-04-bos",
+          "team": "2003-04 Celtics",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2012-13-hou",
+          "team": "2012-13 Rockets",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "2015-16-por",
+      "homeId": "2022-23-mia",
+      "away": "2015-16 Trail Blazers",
+      "home": "2022-23 Heat",
+      "awaySeason": 2016,
+      "homeSeason": 2023,
+      "eraGap": 7,
+      "teams": [
+        {
+          "teamId": "2015-16-por",
+          "team": "2015-16 Trail Blazers",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2022-23-mia",
+          "team": "2022-23 Heat",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "1989-90-cle",
+      "homeId": "2015-16-den",
+      "away": "1989-90 Cavaliers",
+      "home": "2015-16 Nuggets",
+      "awaySeason": 1990,
+      "homeSeason": 2016,
+      "eraGap": 26,
+      "teams": [
+        {
+          "teamId": "1989-90-cle",
+          "team": "1989-90 Cavaliers",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2015-16-den",
+          "team": "2015-16 Nuggets",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "2015-16-sac",
+      "homeId": "1996-97-phi",
+      "away": "2015-16 Kings",
+      "home": "1996-97 76ers",
+      "awaySeason": 2016,
+      "homeSeason": 1997,
+      "eraGap": 19,
+      "teams": [
+        {
+          "teamId": "2015-16-sac",
+          "team": "2015-16 Kings",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "1996-97-phi",
+          "team": "1996-97 76ers",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "1998-99-lal",
+      "homeId": "1991-92-lal",
+      "away": "1998-99 Lakers",
+      "home": "1991-92 Lakers",
+      "awaySeason": 1999,
+      "homeSeason": 1992,
+      "eraGap": 7,
+      "teams": [
+        {
+          "teamId": "1998-99-lal",
+          "team": "1998-99 Lakers",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "1991-92-lal",
+          "team": "1991-92 Lakers",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "2001-02-njn",
+      "homeId": "2000-01-sea",
+      "away": "2001-02 Nets",
+      "home": "2000-01 SuperSonics",
+      "awaySeason": 2002,
+      "homeSeason": 2001,
+      "eraGap": 1,
+      "teams": [
+        {
+          "teamId": "2001-02-njn",
+          "team": "2001-02 Nets",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2000-01-sea",
+          "team": "2000-01 SuperSonics",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "1989-90-dal",
+      "homeId": "2011-12-uta",
+      "away": "1989-90 Mavericks",
+      "home": "2011-12 Jazz",
+      "awaySeason": 1990,
+      "homeSeason": 2012,
+      "eraGap": 22,
+      "teams": [
+        {
+          "teamId": "1989-90-dal",
+          "team": "1989-90 Mavericks",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2011-12-uta",
+          "team": "2011-12 Jazz",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "2008-09-hou",
+      "homeId": "2009-10-lal",
+      "away": "2008-09 Rockets",
+      "home": "2009-10 Lakers",
+      "awaySeason": 2009,
+      "homeSeason": 2010,
+      "eraGap": 1,
+      "teams": [
+        {
+          "teamId": "2008-09-hou",
+          "team": "2008-09 Rockets",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2009-10-lal",
+          "team": "2009-10 Lakers",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "1997-98-atl",
+      "homeId": "2000-01-mil",
+      "away": "1997-98 Hawks",
+      "home": "2000-01 Bucks",
+      "awaySeason": 1998,
+      "homeSeason": 2001,
+      "eraGap": 3,
+      "teams": [
+        {
+          "teamId": "1997-98-atl",
+          "team": "1997-98 Hawks",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2000-01-mil",
+          "team": "2000-01 Bucks",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "2009-10-tor",
+      "homeId": "1996-97-det",
+      "away": "2009-10 Raptors",
+      "home": "1996-97 Pistons",
+      "awaySeason": 2010,
+      "homeSeason": 1997,
+      "eraGap": 13,
+      "teams": [
+        {
+          "teamId": "2009-10-tor",
+          "team": "2009-10 Raptors",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "1996-97-det",
+          "team": "1996-97 Pistons",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "2006-07-orl",
+      "homeId": "2002-03-mia",
+      "away": "2006-07 Magic",
+      "home": "2002-03 Heat",
+      "awaySeason": 2007,
+      "homeSeason": 2003,
+      "eraGap": 4,
+      "teams": [
+        {
+          "teamId": "2006-07-orl",
+          "team": "2006-07 Magic",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2002-03-mia",
+          "team": "2002-03 Heat",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "2007-08-atl",
+      "homeId": "2007-08-bos",
+      "away": "2007-08 Hawks",
+      "home": "2007-08 Celtics",
+      "awaySeason": 2008,
+      "homeSeason": 2008,
+      "eraGap": 0,
+      "teams": [
+        {
+          "teamId": "2007-08-atl",
+          "team": "2007-08 Hawks",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2007-08-bos",
+          "team": "2007-08 Celtics",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "2018-19-atl",
+      "homeId": "2016-17-gsw",
+      "away": "2018-19 Hawks",
+      "home": "2016-17 Warriors",
+      "awaySeason": 2019,
+      "homeSeason": 2017,
+      "eraGap": 2,
+      "teams": [
+        {
+          "teamId": "2018-19-atl",
+          "team": "2018-19 Hawks",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2016-17-gsw",
+          "team": "2016-17 Warriors",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "2000-01-sas",
+      "homeId": "2007-08-chi",
+      "away": "2000-01 Spurs",
+      "home": "2007-08 Bulls",
+      "awaySeason": 2001,
+      "homeSeason": 2008,
+      "eraGap": 7,
+      "teams": [
+        {
+          "teamId": "2000-01-sas",
+          "team": "2000-01 Spurs",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2007-08-chi",
+          "team": "2007-08 Bulls",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "1991-92-nyk",
+      "homeId": "1992-93-por",
+      "away": "1991-92 Knicks",
+      "home": "1992-93 Trail Blazers",
+      "awaySeason": 1992,
+      "homeSeason": 1993,
+      "eraGap": 1,
+      "teams": [
+        {
+          "teamId": "1991-92-nyk",
+          "team": "1991-92 Knicks",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "1992-93-por",
+          "team": "1992-93 Trail Blazers",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "1993-94-njn",
+      "homeId": "2019-20-hou",
+      "away": "1993-94 Nets",
+      "home": "2019-20 Rockets",
+      "awaySeason": 1994,
+      "homeSeason": 2020,
+      "eraGap": 26,
+      "teams": [
+        {
+          "teamId": "1993-94-njn",
+          "team": "1993-94 Nets",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2019-20-hou",
+          "team": "2019-20 Rockets",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "2009-10-chi",
+      "homeId": "1999-00-bos",
+      "away": "2009-10 Bulls",
+      "home": "1999-00 Celtics",
+      "awaySeason": 2010,
+      "homeSeason": 2000,
+      "eraGap": 10,
+      "teams": [
+        {
+          "teamId": "2009-10-chi",
+          "team": "2009-10 Bulls",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "1999-00-bos",
+          "team": "1999-00 Celtics",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "2023-24-mia",
+      "homeId": "2003-04-uta",
+      "away": "2023-24 Heat",
+      "home": "2003-04 Jazz",
+      "awaySeason": 2024,
+      "homeSeason": 2004,
+      "eraGap": 20,
+      "teams": [
+        {
+          "teamId": "2023-24-mia",
+          "team": "2023-24 Heat",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2003-04-uta",
+          "team": "2003-04 Jazz",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "2011-12-okc",
+      "homeId": "2021-22-min",
+      "away": "2011-12 Thunder",
+      "home": "2021-22 Timberwolves",
+      "awaySeason": 2012,
+      "homeSeason": 2022,
+      "eraGap": 10,
+      "teams": [
+        {
+          "teamId": "2011-12-okc",
+          "team": "2011-12 Thunder",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2021-22-min",
+          "team": "2021-22 Timberwolves",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "1997-98-mil",
+      "homeId": "2007-08-por",
+      "away": "1997-98 Bucks",
+      "home": "2007-08 Trail Blazers",
+      "awaySeason": 1998,
+      "homeSeason": 2008,
+      "eraGap": 10,
+      "teams": [
+        {
+          "teamId": "1997-98-mil",
+          "team": "1997-98 Bucks",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2007-08-por",
+          "team": "2007-08 Trail Blazers",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "2002-03-gsw",
+      "homeId": "2003-04-lac",
+      "away": "2002-03 Warriors",
+      "home": "2003-04 Clippers",
+      "awaySeason": 2003,
+      "homeSeason": 2004,
+      "eraGap": 1,
+      "teams": [
+        {
+          "teamId": "2002-03-gsw",
+          "team": "2002-03 Warriors",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2003-04-lac",
+          "team": "2003-04 Clippers",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "1992-93-den",
+      "homeId": "2024-25-tor",
+      "away": "1992-93 Nuggets",
+      "home": "2024-25 Raptors",
+      "awaySeason": 1993,
+      "homeSeason": 2025,
+      "eraGap": 32,
+      "teams": [
+        {
+          "teamId": "1992-93-den",
+          "team": "1992-93 Nuggets",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2024-25-tor",
+          "team": "2024-25 Raptors",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "2016-17-brk",
+      "homeId": "2023-24-mia",
+      "away": "2016-17 Nets",
+      "home": "2023-24 Heat",
+      "awaySeason": 2017,
+      "homeSeason": 2024,
+      "eraGap": 7,
+      "teams": [
+        {
+          "teamId": "2016-17-brk",
+          "team": "2016-17 Nets",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2023-24-mia",
+          "team": "2023-24 Heat",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "2024-25-orl",
+      "homeId": "2004-05-atl",
+      "away": "2024-25 Magic",
+      "home": "2004-05 Hawks",
+      "awaySeason": 2025,
+      "homeSeason": 2005,
+      "eraGap": 20,
+      "teams": [
+        {
+          "teamId": "2024-25-orl",
+          "team": "2024-25 Magic",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2004-05-atl",
+          "team": "2004-05 Hawks",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "2015-16-chi",
+      "homeId": "1992-93-sea",
+      "away": "2015-16 Bulls",
+      "home": "1992-93 SuperSonics",
+      "awaySeason": 2016,
+      "homeSeason": 1993,
+      "eraGap": 23,
+      "teams": [
+        {
+          "teamId": "2015-16-chi",
+          "team": "2015-16 Bulls",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "1992-93-sea",
+          "team": "1992-93 SuperSonics",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "2005-06-chi",
+      "homeId": "2024-25-dal",
+      "away": "2005-06 Bulls",
+      "home": "2024-25 Mavericks",
+      "awaySeason": 2006,
+      "homeSeason": 2025,
+      "eraGap": 19,
+      "teams": [
+        {
+          "teamId": "2005-06-chi",
+          "team": "2005-06 Bulls",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2024-25-dal",
+          "team": "2024-25 Mavericks",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "1996-97-cle",
+      "homeId": "2002-03-mia",
+      "away": "1996-97 Cavaliers",
+      "home": "2002-03 Heat",
+      "awaySeason": 1997,
+      "homeSeason": 2003,
+      "eraGap": 6,
+      "teams": [
+        {
+          "teamId": "1996-97-cle",
+          "team": "1996-97 Cavaliers",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2002-03-mia",
+          "team": "2002-03 Heat",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "2003-04-noh",
+      "homeId": "2004-05-orl",
+      "away": "2003-04 Hornets",
+      "home": "2004-05 Magic",
+      "awaySeason": 2004,
+      "homeSeason": 2005,
+      "eraGap": 1,
+      "teams": [
+        {
+          "teamId": "2003-04-noh",
+          "team": "2003-04 Hornets",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2004-05-orl",
+          "team": "2004-05 Magic",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "2016-17-phi",
+      "homeId": "1995-96-uta",
+      "away": "2016-17 76ers",
+      "home": "1995-96 Jazz",
+      "awaySeason": 2017,
+      "homeSeason": 1996,
+      "eraGap": 21,
+      "teams": [
+        {
+          "teamId": "2016-17-phi",
+          "team": "2016-17 76ers",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "1995-96-uta",
+          "team": "1995-96 Jazz",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "1997-98-chh",
+      "homeId": "2005-06-det",
+      "away": "1997-98 Hornets",
+      "home": "2005-06 Pistons",
+      "awaySeason": 1998,
+      "homeSeason": 2006,
+      "eraGap": 8,
+      "teams": [
+        {
+          "teamId": "1997-98-chh",
+          "team": "1997-98 Hornets",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2005-06-det",
+          "team": "2005-06 Pistons",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "2024-25-okc",
+      "homeId": "2006-07-was",
+      "away": "2024-25 Thunder",
+      "home": "2006-07 Wizards",
+      "awaySeason": 2025,
+      "homeSeason": 2007,
+      "eraGap": 18,
+      "teams": [
+        {
+          "teamId": "2024-25-okc",
+          "team": "2024-25 Thunder",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2006-07-was",
+          "team": "2006-07 Wizards",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "2019-20-pho",
+      "homeId": "2008-09-por",
+      "away": "2019-20 Suns",
+      "home": "2008-09 Trail Blazers",
+      "awaySeason": 2020,
+      "homeSeason": 2009,
+      "eraGap": 11,
+      "teams": [
+        {
+          "teamId": "2019-20-pho",
+          "team": "2019-20 Suns",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2008-09-por",
+          "team": "2008-09 Trail Blazers",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "1991-92-nyk",
+      "homeId": "1991-92-det",
+      "away": "1991-92 Knicks",
+      "home": "1991-92 Pistons",
+      "awaySeason": 1992,
+      "homeSeason": 1992,
+      "eraGap": 0,
+      "teams": [
+        {
+          "teamId": "1991-92-nyk",
+          "team": "1991-92 Knicks",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "1991-92-det",
+          "team": "1991-92 Pistons",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "2013-14-nop",
+      "homeId": "2015-16-det",
+      "away": "2013-14 Pelicans",
+      "home": "2015-16 Pistons",
+      "awaySeason": 2014,
+      "homeSeason": 2016,
+      "eraGap": 2,
+      "teams": [
+        {
+          "teamId": "2013-14-nop",
+          "team": "2013-14 Pelicans",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2015-16-det",
+          "team": "2015-16 Pistons",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "2008-09-den",
+      "homeId": "2022-23-chi",
+      "away": "2008-09 Nuggets",
+      "home": "2022-23 Bulls",
+      "awaySeason": 2009,
+      "homeSeason": 2023,
+      "eraGap": 14,
+      "teams": [
+        {
+          "teamId": "2008-09-den",
+          "team": "2008-09 Nuggets",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2022-23-chi",
+          "team": "2022-23 Bulls",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "1999-00-sac",
+      "homeId": "2022-23-cho",
+      "away": "1999-00 Kings",
+      "home": "2022-23 Hornets",
+      "awaySeason": 2000,
+      "homeSeason": 2023,
+      "eraGap": 23,
+      "teams": [
+        {
+          "teamId": "1999-00-sac",
+          "team": "1999-00 Kings",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2022-23-cho",
+          "team": "2022-23 Hornets",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "2000-01-sas",
+      "homeId": "2000-01-ind",
+      "away": "2000-01 Spurs",
+      "home": "2000-01 Pacers",
+      "awaySeason": 2001,
+      "homeSeason": 2001,
+      "eraGap": 0,
+      "teams": [
+        {
+          "teamId": "2000-01-sas",
+          "team": "2000-01 Spurs",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2000-01-ind",
+          "team": "2000-01 Pacers",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "1991-92-mia",
+      "homeId": "2001-02-mil",
+      "away": "1991-92 Heat",
+      "home": "2001-02 Bucks",
+      "awaySeason": 1992,
+      "homeSeason": 2002,
+      "eraGap": 10,
+      "teams": [
+        {
+          "teamId": "1991-92-mia",
+          "team": "1991-92 Heat",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2001-02-mil",
+          "team": "2001-02 Bucks",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "1998-99-mil",
+      "homeId": "2022-23-ind",
+      "away": "1998-99 Bucks",
+      "home": "2022-23 Pacers",
+      "awaySeason": 1999,
+      "homeSeason": 2023,
+      "eraGap": 24,
+      "teams": [
+        {
+          "teamId": "1998-99-mil",
+          "team": "1998-99 Bucks",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2022-23-ind",
+          "team": "2022-23 Pacers",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "2004-05-cle",
+      "homeId": "1993-94-cle",
+      "away": "2004-05 Cavaliers",
+      "home": "1993-94 Cavaliers",
+      "awaySeason": 2005,
+      "homeSeason": 1994,
+      "eraGap": 11,
+      "teams": [
+        {
+          "teamId": "2004-05-cle",
+          "team": "2004-05 Cavaliers",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "1993-94-cle",
+          "team": "1993-94 Cavaliers",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    },
+    {
+      "awayId": "2016-17-mil",
+      "homeId": "2011-12-mia",
+      "away": "2016-17 Bucks",
+      "home": "2011-12 Heat",
+      "awaySeason": 2017,
+      "homeSeason": 2012,
+      "eraGap": 5,
+      "teams": [
+        {
+          "teamId": "2016-17-mil",
+          "team": "2016-17 Bucks",
+          "side": "away",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        },
+        {
+          "teamId": "2011-12-mia",
+          "team": "2011-12 Heat",
+          "side": "home",
+          "deltas": {
+            "PTS": 0,
+            "2PM": 0,
+            "FGA": 0,
+            "3PM": 0,
+            "3PA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "TOV": 0,
+            "OREB": 0,
+            "AST": 0,
+            "FGM": 0
+          },
+          "failures": []
+        }
+      ]
+    }
+  ]
+}

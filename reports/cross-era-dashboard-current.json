@@ -1,0 +1,76 @@
+{
+  "generatedAt": "2026-06-26T23:38:32.865Z",
+  "thresholds": {
+    "maxOverallWinBias": 0.02,
+    "minNearEqualWinRate": 0.485,
+    "maxNearEqualWinRate": 0.515,
+    "maxSimMinusExpectedMargin": 0.35,
+    "maxSimMinusExpectedPtsBias": 0.35,
+    "maxSimMinusExpectedFgaBias": 0.35,
+    "maxSimMinusExpectedFtaBias": 0.35,
+    "maxSimMinusExpectedTovBias": 0.2,
+    "maxSimMinusExpectedOrbBias": 0.2,
+    "maxMarginGapCoefficient": 0.01,
+    "maxExpectedGapCoefficient": 0.01,
+    "maxWinRateGapCoefficient": 0.001
+  },
+  "reportCount": 1,
+  "passCount": 1,
+  "failCount": 0,
+  "rows": [
+    {
+      "file": "reports/cross-era-model-current-240x50-seed-7777.json",
+      "generatedAt": "2026-06-26T23:33:23.346Z",
+      "modelVersion": "cross-era-midpoint-v1",
+      "seed": 7777,
+      "pairsPerBucket": 240,
+      "gamesPerPair": 50,
+      "guardrailStatus": "pass",
+      "failures": [],
+      "overall": {
+        "pairCount": 1200,
+        "gameCount": 60000,
+        "newerWinRate": 0.5104,
+        "newerWinRateBias": 0.010399999999999965,
+        "newerAvgMargin": 0.47,
+        "expectedNewerAvgMargin": 0.42,
+        "simMinusExpectedMargin": 0.05
+      },
+      "nearEqualCardPower": {
+        "newerWinRate": 0.5101,
+        "newerWinRateBias": 0.010099999999999998,
+        "newerAvgMargin": 0.25,
+        "expectedNewerAvgMargin": 0.4
+      },
+      "simMinusExpectedBias": {
+        "pts": 0.05,
+        "fga": 0.04,
+        "fgPct": 0,
+        "threePa": 0.02,
+        "threePct": 0,
+        "fta": -0.01,
+        "ftPct": 0.0008,
+        "tov": 0.01,
+        "orb": 0.03,
+        "poss": 0
+      },
+      "sourceRelativeBias": {
+        "pts": -1.71,
+        "fga": -0.11,
+        "fgPct": -0.0148,
+        "threePa": -0.88,
+        "threePct": -0.0108,
+        "fta": 2.28,
+        "ftPct": -0.0113,
+        "tov": 0.93,
+        "orb": 1.59,
+        "poss": 0
+      },
+      "regressions": {
+        "simMarginGap": -0.0048,
+        "expectedMarginGap": -0.0075,
+        "winRateGap": -0.0003
+      }
+    }
+  ]
+}

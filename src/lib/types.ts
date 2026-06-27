@@ -6,10 +6,35 @@ export type TurnoverProfileSource = "play-by-play" | "aggregate";
 export type ShotLocationProfileMethod = "sourced-location" | "same-player-neighbor-proxy" | "era-role-neighbor-proxy" | "manual-audit";
 export type SimVenue = "home-court" | "neutral";
 export type SimIntensity = "regular" | "playoff";
+export type EraContextMode = "midpoint" | "away-era" | "home-era" | "older-era" | "newer-era" | "fixed-season" | "custom";
+
+export interface EraContextOptions {
+  mode: EraContextMode;
+  seasonEndYear?: number;
+  blend?: number;
+  customAverages?: Partial<SourceLeague["averages"]>;
+}
+
+export interface TeamGamePlanOptions {
+  usageConcentration?: number;
+  threePointEmphasis?: number;
+  foulPressure?: number;
+  crashBoards?: number;
+  ballSecurity?: number;
+}
+
+export interface GameplayOptions {
+  tempoMultiplier?: number;
+  away?: TeamGamePlanOptions;
+  home?: TeamGamePlanOptions;
+  teamPlans?: Record<string, TeamGamePlanOptions>;
+}
 
 export interface MatchupOptions {
   venue: SimVenue;
   intensity: SimIntensity;
+  eraContext?: EraContextOptions;
+  gameplay?: GameplayOptions;
 }
 
 export type PlayerUnavailableReason = "taken-away" | "fouled-out";
@@ -22,6 +47,7 @@ export interface MatchupContext {
   label: string;
   venue: SimVenue;
   intensity: SimIntensity;
+  eraContext: EraContextOptions;
   homeCourtAdvantagePoints: number;
   awayShotContextAdjustment: number;
   homeShotContextAdjustment: number;
@@ -437,6 +463,93 @@ export interface DiceTeamCard {
   source: SourceTeam;
 }
 
+export interface EraContext {
+  id: string;
+  label: string;
+  mode: EraContextMode;
+  seasonEndYear: number | null;
+  blend: number;
+  averages: SourceLeague["averages"];
+  sourceSeasons: {
+    away: number;
+    home: number;
+  };
+}
+
+export interface ExpectedTeamLine {
+  teamId: string;
+  team: string;
+  possessions: number;
+  pts: number;
+  fga: number;
+  fgPct: number;
+  fg2a: number;
+  fg2m: number;
+  fg2Pct: number;
+  threePa: number;
+  threePm: number;
+  threePct: number;
+  fta: number;
+  ftm: number;
+  ftPct: number;
+  tov: number;
+  orb: number;
+  ast: number;
+  shotZones: Record<ShotZone, number>;
+  makeByZone: Record<ShotZone, number>;
+  pointsPerPossession: number;
+  players: ExpectedPlayerLine[];
+}
+
+export interface ExpectedPlayerLine {
+  playerId: string;
+  player: string;
+  teamId: string;
+  usageShare: number;
+  pts: number;
+  fgm: number;
+  fga: number;
+  fgPct: number;
+  fg2a: number;
+  fg2m: number;
+  fg2Pct: number;
+  threePa: number;
+  threePm: number;
+  threePct: number;
+  fta: number;
+  ftm: number;
+  ftPct: number;
+  tov: number;
+  orb: number;
+  ast: number;
+  shotZones: Record<ShotZone, number>;
+  makeByZone: Record<ShotZone, number>;
+}
+
+export interface ExpectedMatchupLine {
+  options: MatchupOptions;
+  eraContext: EraContext;
+  possessionsEach: number;
+  away: ExpectedTeamLine;
+  home: ExpectedTeamLine;
+  marginForAway: number;
+}
+
+export interface GameModelMetadata {
+  modelVersion: string;
+  contextLabel: string;
+  options: MatchupOptions;
+  eraContext: EraContext;
+  expected: {
+    possessionsEach: number;
+    awayScore: number;
+    homeScore: number;
+    marginForAway: number;
+    away: ExpectedTeamLine;
+    home: ExpectedTeamLine;
+  };
+}
+
 export interface RangeRow {
   label: string;
   range: string;
@@ -486,6 +599,7 @@ export interface MatchupCard {
   home: DiceTeamCard;
   options: MatchupOptions;
   context: MatchupContext;
+  eraContext: EraContext;
   possessionsEach: number;
   quarters: [number, number, number, number];
   overtimePossessionsEach: number;
@@ -550,6 +664,7 @@ export interface GameResult {
   teamStats: Record<string, StatLine>;
   playerStats: Record<string, Record<string, StatLine>>;
   playerAvailabilityEvents?: PlayerAvailabilityEvent[];
+  model?: GameModelMetadata;
   source: "simulated" | "manual";
   playedAt: string;
 }
@@ -668,6 +783,7 @@ export interface LeagueState {
   name: string;
   teamIds: string[];
   games: LeagueGame[];
+  matchupOptions?: MatchupOptions;
   playoffs?: LeaguePlayoffsState;
   currentDate?: string;
   focusTeamId?: string;

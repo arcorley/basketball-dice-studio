@@ -23,7 +23,16 @@ import {
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
-import { buildMatchupCard, createManualResult, defaultMatchupOptions, nRange, simulateGame, simulateTracedGame, summarizeSimulations } from "./lib/diceEngine";
+import {
+  buildExpectedMatchupLine,
+  buildMatchupCard,
+  createManualResult,
+  defaultMatchupOptions,
+  nRange,
+  simulateGame,
+  simulateTracedGame,
+  summarizeSimulations
+} from "./lib/diceEngine";
 import {
   aggregatePlayerStats,
   aggregateTeamStats,
@@ -36,6 +45,7 @@ import {
   renameLeague,
   setLeagueCurrentDate,
   setLeagueFocusTeam,
+  setLeagueMatchupOptions,
   setManualLeagueResult,
   setSimulatedLeagueResult,
   simulateLeagueGameWithTeams,
@@ -50,6 +60,8 @@ import { loadSeasonLeague, loadSeasonLeagueCollection, loadTournament, saveSeaso
 import type {
   DicePlayerCard,
   DiceTeamCard,
+  EraContextMode,
+  EraContextOptions,
   GameResult,
   LeagueGame,
   LeaguePlayoffSeed,
@@ -57,12 +69,14 @@ import type {
   LeagueState,
   MatchupCard,
   MatchupOptions,
+  ExpectedMatchupLine,
   PossessionTrace,
   SimulationOptions,
   SourceCatalog,
   SourcePlayer,
   SourceTeamCatalogEntry,
   StatLine,
+  TeamGamePlanOptions,
   TracedGameResult
 } from "./lib/types";
 
@@ -88,6 +102,70 @@ type TeamLeaderSortKey = "team" | "games" | LeaderStatField;
 type PlayerLeaderSortKey = "player" | "team" | "games" | LeaderStatField;
 type ScheduledLeagueGame = LeagueGame & { date: string; sequence: number };
 type StandingRow = ReturnType<typeof standings>[number];
+
+const minEraContextSeason = 1990;
+const maxEraContextSeason = 2025;
+
+function clampNumber(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function eraContextOptionsKey(options: Pick<MatchupOptions, "eraContext">): string {
+  const eraContext = options.eraContext;
+  if (!eraContext) return "midpoint|0.5|";
+  return `${eraContext.mode}|${eraContext.blend ?? ""}|${eraContext.seasonEndYear ?? ""}`;
+}
+
+const neutralTeamGamePlan: Required<TeamGamePlanOptions> = {
+  usageConcentration: 1,
+  threePointEmphasis: 0,
+  foulPressure: 0,
+  crashBoards: 0,
+  ballSecurity: 0
+};
+
+function normalizedTeamGamePlan(plan: TeamGamePlanOptions | undefined): Required<TeamGamePlanOptions> {
+  return {
+    usageConcentration: clampNumber(plan?.usageConcentration ?? neutralTeamGamePlan.usageConcentration, 0.7, 1.4),
+    threePointEmphasis: clampNumber(plan?.threePointEmphasis ?? neutralTeamGamePlan.threePointEmphasis, -10, 10),
+    foulPressure: clampNumber(plan?.foulPressure ?? neutralTeamGamePlan.foulPressure, -6, 6),
+    crashBoards: clampNumber(plan?.crashBoards ?? neutralTeamGamePlan.crashBoards, -6, 6),
+    ballSecurity: clampNumber(plan?.ballSecurity ?? neutralTeamGamePlan.ballSecurity, -6, 6)
+  };
+}
+
+function teamGamePlanOptionsKey(plan: TeamGamePlanOptions | undefined): string {
+  const normalized = normalizedTeamGamePlan(plan);
+  return [
+    normalized.usageConcentration,
+    normalized.threePointEmphasis,
+    normalized.foulPressure,
+    normalized.crashBoards,
+    normalized.ballSecurity
+  ].join(",");
+}
+
+function gameplayOptionsKey(options: Pick<MatchupOptions, "gameplay">): string {
+  const gameplay = options.gameplay;
+  const teamPlans = Object.entries(gameplay?.teamPlans ?? {})
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([teamId, plan]) => `${teamId}:${teamGamePlanOptionsKey(plan)}`)
+    .join(";");
+  return [
+    gameplay?.tempoMultiplier ?? 1,
+    teamGamePlanOptionsKey(gameplay?.away),
+    teamGamePlanOptionsKey(gameplay?.home),
+    teamPlans
+  ].join("|");
+}
+
+function matchupOptionsKey(options: MatchupOptions): string {
+  return [options.venue, options.intensity, eraContextOptionsKey(options), gameplayOptionsKey(options)].join("||");
+}
+
+function defaultLeagueMatchupOptions(league: LeagueState | null | undefined): MatchupOptions {
+  return league?.matchupOptions ?? defaultMatchupOptions;
+}
 type TeamLeaderRow = { teamId: string; line: StatLine & { games: number } };
 type PlayerLeaderRow = ReturnType<typeof aggregatePlayerStats>[number];
 type SeasonStatLine = StatLine & { games: number };
@@ -631,8 +709,9 @@ function isRegularSeasonGame(game: Pick<LeagueGame, "stage">): boolean {
   return !isPostseasonGame(game);
 }
 
-function leagueGameMatchupOptions(game: Pick<LeagueGame, "stage">): MatchupOptions {
-  return isPostseasonGame(game) ? { venue: "home-court", intensity: "playoff" } : defaultMatchupOptions;
+function leagueGameMatchupOptions(game: Pick<LeagueGame, "stage">, league?: LeagueState | null): MatchupOptions {
+  const base = defaultLeagueMatchupOptions(league);
+  return isPostseasonGame(game) ? { ...base, venue: "home-court", intensity: "playoff" } : base;
 }
 
 function addMonthsIso(date: string, months: number): string {
@@ -712,6 +791,22 @@ function calendarTeamCode(team: SourceTeamCatalogEntry | undefined, teamNames: M
   if (!team) return teamLabel(teamNames, teamId);
   const season = shortSeasonLabel(team.season);
   return season ? `${season} ${team.abbr}` : team.abbr;
+}
+
+function bracketTeamDisplay(team: SourceTeamCatalogEntry | undefined, teamNames: Map<string, string>, teamId: string): { primary: string; secondary?: string; compact: string; full: string } {
+  const fallback = teamLabel(teamNames, teamId);
+  if (!team) return { primary: fallback, compact: fallback, full: fallback };
+
+  const seasonPrefix = `${team.season} `;
+  const primary = team.shortName.startsWith(seasonPrefix) ? team.shortName.slice(seasonPrefix.length) : team.shortName;
+  const season = shortSeasonLabel(team.season);
+  const secondary = [season, team.abbr].filter(Boolean).join(" ");
+  return {
+    primary: primary || team.abbr || fallback,
+    secondary: secondary || undefined,
+    compact: secondary || primary || fallback,
+    full: team.shortName || fallback
+  };
 }
 
 function opponentTeamId(game: Pick<LeagueGame, "awayTeamId" | "homeTeamId">, teamId: string): string {
@@ -891,6 +986,10 @@ function shotAdjustmentLabel(value: number): string {
 function signedLabel(value: number, digits = 1): string {
   const rounded = Math.abs(value).toFixed(digits);
   return value >= 0 ? `+${rounded}` : `-${rounded}`;
+}
+
+function signedPoints(value: number): string {
+  return value === 0 ? "0" : signedLabel(value, 0);
 }
 
 function shotProfileLabel(row: MatchupCard["awayPlayerRanges"][number]): string {
@@ -1931,6 +2030,8 @@ function MatchupStudio({
   sourceTeams: SourceTeamCatalogEntry[];
   seasonChoices: SeasonChoice[];
 }) {
+  const expectedLine = useMemo(() => buildExpectedMatchupLine(matchup.away, matchup.home, matchupOptions), [matchup.away, matchup.home, matchupOptions]);
+
   return (
     <section className="page">
       <header className="page-header">
@@ -1965,6 +2066,7 @@ function MatchupStudio({
         sourceTeams={sourceTeams}
         seasonChoices={seasonChoices}
       />
+      <ExpectedMatchupPanel expected={expectedLine} away={matchup.away} home={matchup.home} />
       <ScreenGameCard matchup={matchup} />
     </section>
   );
@@ -2011,34 +2113,353 @@ function MatchupSetupPanel({
           seasonChoices={seasonChoices}
           sourceTeams={sourceTeams}
         />
-        <MatchupOptionsControls options={matchupOptions} setOptions={setMatchupOptions} />
+        <MatchupOptionsControls matchup={matchup} options={matchupOptions} setOptions={setMatchupOptions} />
       </div>
     </details>
   );
 }
 
-function MatchupOptionsControls({ options, setOptions }: { options: MatchupOptions; setOptions: (options: MatchupOptions) => void }) {
+function MatchupOptionsControls({
+  matchup,
+  options,
+  setOptions
+}: {
+  matchup: MatchupCard;
+  options: MatchupOptions;
+  setOptions: (options: MatchupOptions) => void;
+}) {
+  const eraContext = options.eraContext ?? ({ mode: "midpoint", blend: 0.5 } satisfies EraContextOptions);
+  const awayYear = matchup.away.source.seasonEndYear;
+  const homeYear = matchup.home.source.seasonEndYear;
+  const lowerSeason = Math.max(minEraContextSeason, Math.min(awayYear, homeYear));
+  const upperSeason = Math.min(maxEraContextSeason, Math.max(awayYear, homeYear));
+  const midpointSeason = Math.round((awayYear + homeYear) / 2);
+  const blendPct = Math.round((eraContext.blend ?? 0.5) * 100);
+  const fixedSeason = eraContext.seasonEndYear ?? matchup.eraContext.seasonEndYear ?? midpointSeason;
+  const gameplay = options.gameplay ?? {};
+  const awayPlan = normalizedTeamGamePlan(gameplay.teamPlans?.[matchup.away.id] ?? gameplay.away);
+  const homePlan = normalizedTeamGamePlan(gameplay.teamPlans?.[matchup.home.id] ?? gameplay.home);
+  const tempoPct = Math.round((gameplay.tempoMultiplier ?? 1) * 100);
+  const setEraContext = (next: EraContextOptions) => setOptions({ ...options, eraContext: next });
+  const setEraMode = (mode: EraContextMode) => {
+    if (mode === "midpoint") {
+      setEraContext({ mode, blend: eraContext.blend ?? 0.5 });
+      return;
+    }
+    if (mode === "fixed-season") {
+      setEraContext({ mode, seasonEndYear: clampNumber(fixedSeason, lowerSeason, upperSeason) });
+      return;
+    }
+    setEraContext({ mode });
+  };
+  const setTempoPct = (tempo: number) => {
+    setOptions({
+      ...options,
+      gameplay: {
+        ...gameplay,
+        tempoMultiplier: clampNumber(tempo, 85, 115) / 100
+      }
+    });
+  };
+  const setPlan = (side: "away" | "home", teamId: string, plan: Required<TeamGamePlanOptions>) => {
+    setOptions({
+      ...options,
+      gameplay: {
+        ...gameplay,
+        [side]: plan,
+        teamPlans: {
+          ...(gameplay.teamPlans ?? {}),
+          [teamId]: plan
+        }
+      }
+    });
+  };
+  const resetGameplay = () => {
+    setOptions({
+      ...options,
+      gameplay: {
+        tempoMultiplier: 1,
+        away: neutralTeamGamePlan,
+        home: neutralTeamGamePlan,
+        teamPlans: {
+          [matchup.away.id]: neutralTeamGamePlan,
+          [matchup.home.id]: neutralTeamGamePlan
+        }
+      }
+    });
+  };
+
   return (
-    <div className="options-bar">
-      <SegmentedControl
-        label="Venue"
-        value={options.venue}
-        options={[
-          { value: "home-court", label: "Home court" },
-          { value: "neutral", label: "Neutral" }
-        ]}
-        onChange={(venue) => setOptions({ ...options, venue })}
-      />
-      <SegmentedControl
-        label="Game type"
-        value={options.intensity}
-        options={[
-          { value: "regular", label: "Regular" },
-          { value: "playoff", label: "Playoff" }
-        ]}
-        onChange={(intensity) => setOptions({ ...options, intensity })}
-      />
+    <div className="matchup-options-stack">
+      <div className="options-bar">
+        <SegmentedControl
+          label="Venue"
+          value={options.venue}
+          options={[
+            { value: "home-court", label: "Home court" },
+            { value: "neutral", label: "Neutral" }
+          ]}
+          onChange={(venue) => setOptions({ ...options, venue })}
+        />
+        <SegmentedControl
+          label="Game type"
+          value={options.intensity}
+          options={[
+            { value: "regular", label: "Regular" },
+            { value: "playoff", label: "Playoff" }
+          ]}
+          onChange={(intensity) => setOptions({ ...options, intensity })}
+        />
+        <SegmentedControl<EraContextMode>
+          label="Era"
+          value={eraContext.mode}
+          options={[
+            { value: "midpoint", label: "Midpoint" },
+            { value: "older-era", label: "Older" },
+            { value: "newer-era", label: "Newer" },
+            { value: "away-era", label: "Away" },
+            { value: "home-era", label: "Home" },
+            { value: "fixed-season", label: "Fixed" }
+          ]}
+          onChange={setEraMode}
+        />
+        {eraContext.mode === "midpoint" && (
+          <label className="era-slider-control">
+            <span>Blend</span>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              step={5}
+              value={blendPct}
+              onChange={(event) => setEraContext({ mode: "midpoint", blend: Number(event.target.value) / 100 })}
+            />
+            <b>{blendPct}%</b>
+          </label>
+        )}
+        {eraContext.mode === "fixed-season" && (
+          <label className="era-number-control">
+            <span>Season</span>
+            <input
+              type="number"
+              min={lowerSeason}
+              max={upperSeason}
+              value={fixedSeason}
+              onChange={(event) => {
+                const parsed = Number(event.target.value);
+                setEraContext({
+                  mode: "fixed-season",
+                  seasonEndYear: Number.isFinite(parsed) ? clampNumber(Math.round(parsed), lowerSeason, upperSeason) : midpointSeason
+                });
+              }}
+            />
+          </label>
+        )}
+      </div>
+      <div className="game-plan-controls">
+        <div className="game-plan-header">
+          <label className="era-slider-control tempo-control">
+            <span>Tempo</span>
+            <input type="range" min={85} max={115} step={1} value={tempoPct} onChange={(event) => setTempoPct(Number(event.target.value))} />
+            <b>{tempoPct}%</b>
+          </label>
+          <Button icon={<RotateCcw size={14} />} onClick={resetGameplay}>
+            Reset plan
+          </Button>
+        </div>
+        <GamePlanSliders team={matchup.away} label="Away plan" plan={awayPlan} onChange={(plan) => setPlan("away", matchup.away.id, plan)} />
+        <GamePlanSliders team={matchup.home} label="Home plan" plan={homePlan} onChange={(plan) => setPlan("home", matchup.home.id, plan)} />
+      </div>
     </div>
+  );
+}
+
+function GamePlanSliders({
+  team,
+  label,
+  plan,
+  onChange
+}: {
+  team: DiceTeamCard;
+  label: string;
+  plan: Required<TeamGamePlanOptions>;
+  onChange: (plan: Required<TeamGamePlanOptions>) => void;
+}) {
+  const update = (field: keyof Required<TeamGamePlanOptions>, value: number) => onChange({ ...plan, [field]: value });
+  return (
+    <div className="game-plan-team">
+      <div className="game-plan-team-title">
+        <TeamLogo team={team} className="team-logo-mini" />
+        <span>
+          <strong>{label}</strong>
+          <small>{team.shortName}</small>
+        </span>
+      </div>
+      <label className="era-slider-control">
+        <span>Usage</span>
+        <input
+          type="range"
+          min={70}
+          max={140}
+          step={5}
+          value={Math.round(plan.usageConcentration * 100)}
+          onChange={(event) => update("usageConcentration", Number(event.target.value) / 100)}
+        />
+        <b>{formatNumber(plan.usageConcentration, 2)}x</b>
+      </label>
+      <label className="era-slider-control">
+        <span>3PA</span>
+        <input type="range" min={-10} max={10} step={1} value={plan.threePointEmphasis} onChange={(event) => update("threePointEmphasis", Number(event.target.value))} />
+        <b>{signedPoints(plan.threePointEmphasis)}</b>
+      </label>
+      <label className="era-slider-control">
+        <span>Fouls</span>
+        <input type="range" min={-6} max={6} step={1} value={plan.foulPressure} onChange={(event) => update("foulPressure", Number(event.target.value))} />
+        <b>{signedPoints(plan.foulPressure)}</b>
+      </label>
+      <label className="era-slider-control">
+        <span>Boards</span>
+        <input type="range" min={-6} max={6} step={1} value={plan.crashBoards} onChange={(event) => update("crashBoards", Number(event.target.value))} />
+        <b>{signedPoints(plan.crashBoards)}</b>
+      </label>
+      <label className="era-slider-control">
+        <span>Security</span>
+        <input type="range" min={-6} max={6} step={1} value={plan.ballSecurity} onChange={(event) => update("ballSecurity", Number(event.target.value))} />
+        <b>{signedPoints(plan.ballSecurity)}</b>
+      </label>
+    </div>
+  );
+}
+
+function ExpectedMatchupPanel({ expected, away, home }: { expected: ExpectedMatchupLine; away: DiceTeamCard; home: DiceTeamCard }) {
+  const marginLabel = expected.marginForAway >= 0 ? `${away.shortName} +${formatNumber(expected.marginForAway, 1)}` : `${home.shortName} +${formatNumber(-expected.marginForAway, 1)}`;
+  return (
+    <article className="panel expected-line-panel">
+      <div className="panel-title">
+        <div>
+          <h3>Expected Line</h3>
+          <p>{expected.eraContext.label}</p>
+        </div>
+        <span className="badge">{expected.possessionsEach} poss/team</span>
+      </div>
+      <div className="metric-grid expected-line-metrics">
+        <div className="metric">
+          <span>Projected score</span>
+          <strong>
+            {formatNumber(expected.away.pts, 1)}-{formatNumber(expected.home.pts, 1)}
+          </strong>
+        </div>
+        <div className="metric">
+          <span>Margin</span>
+          <strong>{marginLabel}</strong>
+        </div>
+        <div className="metric">
+          <span>Away PPP</span>
+          <strong>{formatNumber(expected.away.pointsPerPossession, 2)}</strong>
+        </div>
+        <div className="metric">
+          <span>Home PPP</span>
+          <strong>{formatNumber(expected.home.pointsPerPossession, 2)}</strong>
+        </div>
+      </div>
+      <div className="table-wrap expected-line-table">
+        <table>
+          <thead>
+            <tr>
+              <th>Team</th>
+              <th>PTS</th>
+              <th>FGA</th>
+              <th>FG%</th>
+              <th>3PA</th>
+              <th>3P%</th>
+              <th>FTA</th>
+              <th>FT%</th>
+              <th>TOV</th>
+              <th>ORB</th>
+              <th>AST</th>
+            </tr>
+          </thead>
+          <tbody>
+            {[
+              { team: away, line: expected.away },
+              { team: home, line: expected.home }
+            ].map(({ team, line }) => (
+              <tr key={team.id}>
+                <th scope="row">
+                  <TeamIdentityButton team={team} className="standings-team compact-team-identity" />
+                </th>
+                <td>{formatNumber(line.pts, 1)}</td>
+                <td>{formatNumber(line.fga, 1)}</td>
+                <td>{formatPct(line.fgPct, 1)}</td>
+                <td>{formatNumber(line.threePa, 1)}</td>
+                <td>{formatPct(line.threePct, 1)}</td>
+                <td>{formatNumber(line.fta, 1)}</td>
+                <td>{formatPct(line.ftPct, 1)}</td>
+                <td>{formatNumber(line.tov, 1)}</td>
+                <td>{formatNumber(line.orb, 1)}</td>
+                <td>{formatNumber(line.ast, 1)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="expected-player-grid">
+        <ExpectedPlayerLineTable team={away} players={expected.away.players} />
+        <ExpectedPlayerLineTable team={home} players={expected.home.players} />
+      </div>
+    </article>
+  );
+}
+
+function ExpectedPlayerLineTable({ team, players }: { team: DiceTeamCard; players: ExpectedMatchupLine["away"]["players"] }) {
+  const playersById = new Map(team.players.map((player) => [player.id, player]));
+  return (
+    <section className="expected-player-table">
+      <div className="team-card-section-title">
+        <h4>{team.shortName} Player Expected Line</h4>
+        <span>{players.length} players</span>
+      </div>
+      <div className="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Player</th>
+              <th>USG</th>
+              <th>PTS</th>
+              <th>FG</th>
+              <th>3PT</th>
+              <th>FT</th>
+              <th>OREB</th>
+              <th>AST</th>
+              <th>TOV</th>
+            </tr>
+          </thead>
+          <tbody>
+            {players.map((line) => (
+              <tr key={line.playerId}>
+                <th scope="row">
+                  <PlayerIdentity player={playersById.get(line.playerId)} name={line.player} />
+                </th>
+                <td>{formatPct(line.usageShare, 1)}</td>
+                <td>{formatNumber(line.pts, 1)}</td>
+                <td>
+                  {formatNumber(line.fgm, 1)}-{formatNumber(line.fga, 1)}
+                </td>
+                <td>
+                  {formatNumber(line.threePm, 1)}-{formatNumber(line.threePa, 1)}
+                </td>
+                <td>
+                  {formatNumber(line.ftm, 1)}-{formatNumber(line.fta, 1)}
+                </td>
+                <td>{formatNumber(line.orb, 1)}</td>
+                <td>{formatNumber(line.ast, 1)}</td>
+                <td>{formatNumber(line.tov, 1)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }
 
@@ -2099,6 +2520,7 @@ function PlayableMatchup({
   const [saved, setSaved] = useState(false);
   const cardOpener = useCardOpener();
   const availabilityKey = (matchupOptions.unavailablePlayerIds ?? []).join("|");
+  const optionsKey = matchupOptionsKey(matchupOptions);
 
   useEffect(() => {
     setGame(null);
@@ -2109,7 +2531,7 @@ function PlayableMatchup({
     setSpeed("manual");
     setWatchView("game");
     setSaved(false);
-  }, [matchup.away.id, matchup.home.id, matchupOptions.venue, matchupOptions.intensity, availabilityKey]);
+  }, [matchup.away.id, matchup.home.id, optionsKey, availabilityKey]);
 
   useEffect(() => {
     if (!game || speed === "manual" || visibleCount >= game.possessions.length) return;
@@ -2920,6 +3342,7 @@ function Simulator({
   const [bulkGames, setBulkGames] = useState(500);
   const [bulk, setBulk] = useState<ReturnType<typeof summarizeSimulations> | null>(null);
   const [takenAwayPlayerId, setTakenAwayPlayerId] = useState("");
+  const expectedLine = useMemo(() => buildExpectedMatchupLine(away, home, matchupOptions), [away, home, matchupOptions]);
   const takenAwayPlayer = useMemo(() => {
     for (const team of [away, home]) {
       const player = team.players.find((candidate) => candidate.id === takenAwayPlayerId);
@@ -2934,11 +3357,12 @@ function Simulator({
     }),
     [matchupOptions, takenAwayPlayerId]
   );
+  const optionsKey = matchupOptionsKey(matchupOptions);
 
   useEffect(() => {
     setResult(null);
     setBulk(null);
-  }, [away.id, home.id, matchupOptions.venue, matchupOptions.intensity, takenAwayPlayerId]);
+  }, [away.id, home.id, optionsKey, takenAwayPlayerId]);
 
   useEffect(() => {
     if (!takenAwayPlayerId) return;
@@ -2977,6 +3401,7 @@ function Simulator({
         seasonChoices={seasonChoices}
         sourceTeams={sourceTeams}
       />
+      <ExpectedMatchupPanel expected={expectedLine} away={away} home={home} />
 
       <article className="panel simulation-availability-panel">
         <div className="panel-title">
@@ -3193,6 +3618,13 @@ function GameResultContent({ result, away, home, showHeader = true }: { result: 
           <div className="game-meta-list">
             <span className={`status ${result.source}`}>{result.source}</span>
             <span>{result.possessionsEach} poss/team</span>
+            {result.model && <span>{result.model.modelVersion}</span>}
+            {result.model && <span>{result.model.contextLabel}</span>}
+            {result.model && (
+              <span>
+                Exp {formatNumber(result.model.expected.awayScore, 1)}-{formatNumber(result.model.expected.homeScore, 1)}
+              </span>
+            )}
             <span>{Number.isNaN(playedAt.getTime()) ? "-" : playedAt.toLocaleString()}</span>
           </div>
         </div>
@@ -3837,7 +4269,7 @@ function SeasonLeagueView({
     setLeagueError(null);
     try {
       const [away, home] = await Promise.all([loadTeam(game.awayTeamId), loadTeam(game.homeTeamId)]);
-      const nextLeague = simulateLeagueGameWithTeams(league, game.id, away, home, Date.now(), leagueGameMatchupOptions(game));
+      const nextLeague = simulateLeagueGameWithTeams(league, game.id, away, home, Date.now(), leagueGameMatchupOptions(game, league));
       const gameDate = scheduledGames.find((scheduledGame) => scheduledGame.id === game.id)?.date;
       commitLeague(isRegularSeasonGame(game) && gameDate && (!league.currentDate || gameDate > league.currentDate) ? setLeagueCurrentDate(nextLeague, gameDate) : nextLeague);
     } catch (reason) {
@@ -3939,6 +4371,12 @@ function SeasonLeagueView({
     commitLeague(setLeagueFocusTeam(league, teamId === allTeamsValue ? null : teamId));
   };
 
+  const changeLeagueMatchupOptions = (options: MatchupOptions) => {
+    if (!league) return;
+    commitLeague(setLeagueMatchupOptions(league, options));
+    setBatchRequest(null);
+  };
+
   const previewBatchSimulation = () => {
     setLeagueError(null);
     if (!filteredUnplayedGames.length) {
@@ -3973,7 +4411,7 @@ function SeasonLeagueView({
         const away = cards.get(game.awayTeamId);
         const home = cards.get(game.homeTeamId);
         if (!away || !home) throw new Error(`Missing team card for ${game.awayTeamId} or ${game.homeTeamId}.`);
-        nextLeague = simulateLeagueGameWithTeams(nextLeague, game.id, away, home, seed, leagueGameMatchupOptions(game));
+        nextLeague = simulateLeagueGameWithTeams(nextLeague, game.id, away, home, seed, leagueGameMatchupOptions(game, nextLeague));
         seed += 1;
       }
       if (batchRequest.advanceToDate) {
@@ -4445,6 +4883,7 @@ function SeasonLeagueView({
               </div>
             </article>
           )}
+          <LeagueModelSettingsPanel league={league} onChange={changeLeagueMatchupOptions} />
           <div className="mode-tabs league-tabs">
             {!postseasonComplete && (
               <button type="button" className={activeSection === "schedule" ? "active" : ""} onClick={() => setSection("schedule")}>
@@ -5246,7 +5685,8 @@ function BracketSeriesCard({
 
   const state = playoffSeriesState(league, series);
   const nextGame = state.nextGame ? scheduledById.get(state.nextGame.id) : undefined;
-  const status = state.winnerTeamId ? `${teamLabel(teamNames, state.winnerTeamId)} advances` : nextGame ? `Next: Game ${nextGame.playoffGameNumber}` : "Series pending";
+  const winnerTeam = state.winnerTeamId ? sourceTeamsById.get(state.winnerTeamId) : undefined;
+  const status = state.winnerTeamId ? `${bracketTeamDisplay(winnerTeam, teamNames, state.winnerTeamId).compact} advances` : nextGame ? `Next: Game ${nextGame.playoffGameNumber}` : "Series pending";
   return (
     <button type="button" className={`bracket-series-card ${state.winnerTeamId ? "complete" : ""}`} onClick={() => onSelectSeries(series.id)}>
       <span className="bracket-series-meta">
@@ -5280,12 +5720,16 @@ function BracketTeamLine({
   sourceTeamsById: Map<string, SourceTeamCatalogEntry>;
 }) {
   const team = sourceTeamsById.get(teamId);
+  const display = bracketTeamDisplay(team, teamNames, teamId);
   const displayValue = score ?? wins;
   return (
-    <span className={`bracket-team-line ${winner ? "winner" : ""}`}>
+    <span className={`bracket-team-line ${winner ? "winner" : ""}`} title={display.full}>
       <span className="bracket-seed">{seed ?? "-"}</span>
       {team ? <TeamLogo team={team} className="team-logo-mini" /> : <span className="standings-logo-placeholder" aria-hidden="true" />}
-      <strong>{teamLabel(teamNames, teamId)}</strong>
+      <span className="bracket-team-copy">
+        <strong>{display.primary}</strong>
+        {display.secondary && <small>{display.secondary}</small>}
+      </span>
       <b>{displayValue ?? "-"}</b>
     </span>
   );
@@ -5373,7 +5817,7 @@ function PlayInGameCard({
         <BracketTeamLine teamId={row.homeTeamId} seed={row.homeSeed} score={game ? teamGameScore(game, row.homeTeamId) : undefined} winner={winnerTeamId === row.homeTeamId} teamNames={teamNames} sourceTeamsById={sourceTeamsById} />
       </span>
       <div className="postseason-card-footer">
-        <span>{winnerTeamId ? `${teamLabel(teamNames, winnerTeamId)} advances` : "Unplayed"}</span>
+        <span>{winnerTeamId ? `${bracketTeamDisplay(sourceTeamsById.get(winnerTeamId), teamNames, winnerTeamId).compact} advances` : "Unplayed"}</span>
         <div className="postseason-game-actions">
           {game && (
             <Button icon={<FileText size={14} />} onClick={() => onOpenGame(game)}>
@@ -6021,6 +6465,120 @@ function LeagueGameInfoModal({
   );
 }
 
+function LeagueModelSettingsPanel({ league, onChange }: { league: LeagueState; onChange: (options: MatchupOptions) => void }) {
+  const options = defaultLeagueMatchupOptions(league);
+  const eraContext = options.eraContext ?? ({ mode: "midpoint", blend: 0.5 } satisfies EraContextOptions);
+  const gameplay = options.gameplay ?? {};
+  const blendPct = Math.round((eraContext.blend ?? 0.5) * 100);
+  const fixedSeason = eraContext.seasonEndYear ?? Math.round((minEraContextSeason + maxEraContextSeason) / 2);
+  const tempoPct = Math.round((gameplay.tempoMultiplier ?? 1) * 100);
+  const setOptions = (next: MatchupOptions) => onChange(next);
+  const setEraContext = (next: EraContextOptions) => setOptions({ ...options, eraContext: next });
+  const setEraMode = (mode: EraContextMode) => {
+    if (mode === "midpoint") {
+      setEraContext({ mode, blend: eraContext.blend ?? 0.5 });
+      return;
+    }
+    if (mode === "fixed-season") {
+      setEraContext({ mode, seasonEndYear: clampNumber(fixedSeason, minEraContextSeason, maxEraContextSeason) });
+      return;
+    }
+    setEraContext({ mode });
+  };
+
+  return (
+    <details className="panel setup-panel league-model-settings">
+      <summary>
+        <span className="setup-summary-main">
+          <strong>Model Settings</strong>
+          <span>{league.name}</span>
+        </span>
+        <span className="setup-summary-meta">{eraContext.mode === "midpoint" ? `Midpoint ${blendPct}%` : eraContext.mode.replace("-", " ")}</span>
+      </summary>
+      <div className="setup-panel-body">
+        <div className="options-bar">
+          <SegmentedControl
+            label="Venue"
+            value={options.venue}
+            options={[
+              { value: "home-court", label: "Home court" },
+              { value: "neutral", label: "Neutral" }
+            ]}
+            onChange={(venue) => setOptions({ ...options, venue })}
+          />
+          <SegmentedControl
+            label="Game type"
+            value={options.intensity}
+            options={[
+              { value: "regular", label: "Regular" },
+              { value: "playoff", label: "Playoff" }
+            ]}
+            onChange={(intensity) => setOptions({ ...options, intensity })}
+          />
+          <SegmentedControl<EraContextMode>
+            label="Era"
+            value={eraContext.mode}
+            options={[
+              { value: "midpoint", label: "Midpoint" },
+              { value: "older-era", label: "Older" },
+              { value: "newer-era", label: "Newer" },
+              { value: "away-era", label: "Away" },
+              { value: "home-era", label: "Home" },
+              { value: "fixed-season", label: "Fixed" }
+            ]}
+            onChange={setEraMode}
+          />
+          {eraContext.mode === "midpoint" && (
+            <label className="era-slider-control">
+              <span>Blend</span>
+              <input type="range" min={0} max={100} step={5} value={blendPct} onChange={(event) => setEraContext({ mode: "midpoint", blend: Number(event.target.value) / 100 })} />
+              <b>{blendPct}%</b>
+            </label>
+          )}
+          {eraContext.mode === "fixed-season" && (
+            <label className="era-number-control">
+              <span>Season</span>
+              <input
+                type="number"
+                min={minEraContextSeason}
+                max={maxEraContextSeason}
+                value={fixedSeason}
+                onChange={(event) => {
+                  const parsed = Number(event.target.value);
+                  setEraContext({
+                    mode: "fixed-season",
+                    seasonEndYear: Number.isFinite(parsed) ? clampNumber(Math.round(parsed), minEraContextSeason, maxEraContextSeason) : fixedSeason
+                  });
+                }}
+              />
+            </label>
+          )}
+          <label className="era-slider-control tempo-control">
+            <span>Tempo</span>
+            <input
+              type="range"
+              min={85}
+              max={115}
+              step={1}
+              value={tempoPct}
+              onChange={(event) =>
+                setOptions({
+                  ...options,
+                  gameplay: {
+                    ...gameplay,
+                    tempoMultiplier: Number(event.target.value) / 100
+                  }
+                })
+              }
+            />
+            <b>{tempoPct}%</b>
+          </label>
+        </div>
+      </div>
+    </details>
+  );
+}
+
 function LeagueWatchGameLoader({
   game,
   league,
@@ -6038,7 +6596,7 @@ function LeagueWatchGameLoader({
   const [error, setError] = useState<string | null>(null);
   const leagueRows = useMemo(() => new Map(standings(league).map((row) => [row.teamId, row])), [league]);
   const leagueRecord = (teamId: string) => standingsRecordLabel(leagueRows.get(teamId));
-  const matchupOptions = leagueGameMatchupOptions(game);
+  const matchupOptions = leagueGameMatchupOptions(game, league);
 
   useEffect(() => {
     let active = true;
@@ -6174,7 +6732,7 @@ function ManualResultForm({
   const [activePlayerCard, setActivePlayerCard] = useState<{ team: DiceTeamCard; player: DicePlayerCard } | null>(null);
   const leagueRows = useMemo(() => new Map(standings(league).map((row) => [row.teamId, row])), [league]);
   const leagueRecord = (teamId: string) => standingsRecordLabel(leagueRows.get(teamId));
-  const matchupOptions = leagueGameMatchupOptions(game);
+  const matchupOptions = leagueGameMatchupOptions(game, league);
 
   const update = (team: DiceTeamCard, player: string, field: string, value: number) => {
     const key = statInputKey(team, player);

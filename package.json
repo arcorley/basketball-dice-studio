@@ -1,6 +1,6 @@
 {
   "name": "basketball-dice-studio",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "Local-first tabletop basketball dice game studio.",
   "private": true,
   "type": "module",
@@ -28,6 +28,14 @@
     "data:validate": "python3 scripts/validate-data.py",
     "data:refresh": "npm run data:discover && npm run fetch:data -- --use-cache && npm run data:sqlite && npm run data:export-json && npm run data:validate",
     "calibrate:matchup": "tsx scripts/calibrate-matchup.ts",
+    "analyze:same-era": "tsx scripts/analyze-same-era-calibration.ts",
+    "analyze:cross-era": "tsx scripts/analyze-cross-era.ts",
+    "tune:cross-era": "tsx scripts/tune-cross-era-model.ts",
+    "validate:cross-era": "tsx scripts/validate-cross-era-report.ts",
+    "dashboard:cross-era": "tsx scripts/build-cross-era-dashboard.ts",
+    "validate:expected-players": "tsx scripts/validate-expected-player-lines.ts",
+    "sweep:gameplay-levers": "tsx scripts/sweep-gameplay-levers.ts",
+    "acceptance:model": "tsx scripts/model-acceptance.ts",
     "sanity:accuracy": "tsx scripts/sanity-accuracy.ts",
     "simulate:2021-season": "tsx scripts/simulate-2021-season.ts",
     "simulate:2021-season:direct": "tsx scripts/simulate-2021-season-direct.ts"
