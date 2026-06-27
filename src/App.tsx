@@ -134,6 +134,17 @@ function normalizedTeamGamePlan(plan: TeamGamePlanOptions | undefined): Required
   };
 }
 
+function isNeutralTeamGamePlan(plan: TeamGamePlanOptions | undefined): boolean {
+  const normalized = normalizedTeamGamePlan(plan);
+  return (
+    normalized.usageConcentration === neutralTeamGamePlan.usageConcentration &&
+    normalized.threePointEmphasis === neutralTeamGamePlan.threePointEmphasis &&
+    normalized.foulPressure === neutralTeamGamePlan.foulPressure &&
+    normalized.crashBoards === neutralTeamGamePlan.crashBoards &&
+    normalized.ballSecurity === neutralTeamGamePlan.ballSecurity
+  );
+}
+
 function teamGamePlanOptionsKey(plan: TeamGamePlanOptions | undefined): string {
   const normalized = normalizedTeamGamePlan(plan);
   return [
@@ -2280,7 +2291,7 @@ function GamePlanSliders({
   plan,
   onChange
 }: {
-  team: DiceTeamCard;
+  team: VisualTeam;
   label: string;
   plan: Required<TeamGamePlanOptions>;
   onChange: (plan: Required<TeamGamePlanOptions>) => void;
@@ -4883,7 +4894,7 @@ function SeasonLeagueView({
               </div>
             </article>
           )}
-          <LeagueModelSettingsPanel league={league} onChange={changeLeagueMatchupOptions} />
+          <LeagueModelSettingsPanel league={league} teams={leagueTeamEntries} onChange={changeLeagueMatchupOptions} />
           <div className="mode-tabs league-tabs">
             {!postseasonComplete && (
               <button type="button" className={activeSection === "schedule" ? "active" : ""} onClick={() => setSection("schedule")}>
@@ -6465,13 +6476,26 @@ function LeagueGameInfoModal({
   );
 }
 
-function LeagueModelSettingsPanel({ league, onChange }: { league: LeagueState; onChange: (options: MatchupOptions) => void }) {
+function LeagueModelSettingsPanel({
+  league,
+  teams,
+  onChange
+}: {
+  league: LeagueState;
+  teams: SourceTeamCatalogEntry[];
+  onChange: (options: MatchupOptions) => void;
+}) {
   const options = defaultLeagueMatchupOptions(league);
   const eraContext = options.eraContext ?? ({ mode: "midpoint", blend: 0.5 } satisfies EraContextOptions);
   const gameplay = options.gameplay ?? {};
   const blendPct = Math.round((eraContext.blend ?? 0.5) * 100);
   const fixedSeason = eraContext.seasonEndYear ?? Math.round((minEraContextSeason + maxEraContextSeason) / 2);
   const tempoPct = Math.round((gameplay.tempoMultiplier ?? 1) * 100);
+  const [activeTeamId, setActiveTeamId] = useState(league.focusTeamId ?? league.teamIds[0] ?? "");
+  const activeTeam = teams.find((team) => team.id === activeTeamId) ?? teams[0];
+  const activePlan = normalizedTeamGamePlan(activeTeam ? gameplay.teamPlans?.[activeTeam.id] : undefined);
+  const adjustedTeamCount = league.teamIds.filter((teamId) => !isNeutralTeamGamePlan(gameplay.teamPlans?.[teamId])).length;
+  const activePlanAdjusted = !isNeutralTeamGamePlan(activePlan);
   const setOptions = (next: MatchupOptions) => onChange(next);
   const setEraContext = (next: EraContextOptions) => setOptions({ ...options, eraContext: next });
   const setEraMode = (mode: EraContextMode) => {
@@ -6485,6 +6509,44 @@ function LeagueModelSettingsPanel({ league, onChange }: { league: LeagueState; o
     }
     setEraContext({ mode });
   };
+  const setTempoPct = (tempo: number) => {
+    setOptions({
+      ...options,
+      gameplay: {
+        ...gameplay,
+        tempoMultiplier: clampNumber(tempo, 85, 115) / 100
+      }
+    });
+  };
+  const setTeamPlan = (teamId: string, plan: Required<TeamGamePlanOptions>) => {
+    const nextTeamPlans = { ...(gameplay.teamPlans ?? {}) };
+    const normalized = normalizedTeamGamePlan(plan);
+    if (isNeutralTeamGamePlan(normalized)) {
+      delete nextTeamPlans[teamId];
+    } else {
+      nextTeamPlans[teamId] = normalized;
+    }
+    setOptions({
+      ...options,
+      gameplay: {
+        ...gameplay,
+        teamPlans: Object.keys(nextTeamPlans).length ? nextTeamPlans : undefined
+      }
+    });
+  };
+  const resetAllGamePlans = () => {
+    setOptions({
+      ...options,
+      gameplay: {
+        tempoMultiplier: 1
+      }
+    });
+  };
+
+  useEffect(() => {
+    if (activeTeamId && league.teamIds.includes(activeTeamId)) return;
+    setActiveTeamId(league.focusTeamId ?? league.teamIds[0] ?? "");
+  }, [activeTeamId, league.focusTeamId, league.teamIds]);
 
   return (
     <details className="panel setup-panel league-model-settings">
@@ -6493,7 +6555,9 @@ function LeagueModelSettingsPanel({ league, onChange }: { league: LeagueState; o
           <strong>Model Settings</strong>
           <span>{league.name}</span>
         </span>
-        <span className="setup-summary-meta">{eraContext.mode === "midpoint" ? `Midpoint ${blendPct}%` : eraContext.mode.replace("-", " ")}</span>
+        <span className="setup-summary-meta">
+          {eraContext.mode === "midpoint" ? `Midpoint ${blendPct}%` : eraContext.mode.replace("-", " ")} · {tempoPct}% · {adjustedTeamCount} plans
+        </span>
       </summary>
       <div className="setup-panel-body">
         <div className="options-bar">
@@ -6561,19 +6625,37 @@ function LeagueModelSettingsPanel({ league, onChange }: { league: LeagueState; o
               max={115}
               step={1}
               value={tempoPct}
-              onChange={(event) =>
-                setOptions({
-                  ...options,
-                  gameplay: {
-                    ...gameplay,
-                    tempoMultiplier: Number(event.target.value) / 100
-                  }
-                })
-              }
+              onChange={(event) => setTempoPct(Number(event.target.value))}
             />
             <b>{tempoPct}%</b>
           </label>
         </div>
+        {activeTeam && (
+          <div className="game-plan-controls league-game-plan-controls">
+            <div className="game-plan-header league-game-plan-header">
+              <label className="inline-input league-plan-team-select">
+                Team
+                <select value={activeTeam.id} onChange={(event) => setActiveTeamId(event.target.value)}>
+                  {teams.map((team) => (
+                    <option key={team.id} value={team.id}>
+                      {team.shortName}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="league-plan-actions">
+                <span className="badge">{activePlanAdjusted ? "Custom plan" : "Neutral plan"}</span>
+                <Button icon={<RotateCcw size={14} />} disabled={!activePlanAdjusted} onClick={() => setTeamPlan(activeTeam.id, neutralTeamGamePlan)}>
+                  Reset Team
+                </Button>
+                <Button icon={<RotateCcw size={14} />} disabled={tempoPct === 100 && adjustedTeamCount === 0} onClick={resetAllGamePlans}>
+                  Reset All
+                </Button>
+              </div>
+            </div>
+            <GamePlanSliders team={activeTeam} label="Team plan" plan={activePlan} onChange={(plan) => setTeamPlan(activeTeam.id, plan)} />
+          </div>
+        )}
       </div>
     </details>
   );

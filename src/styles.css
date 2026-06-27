@@ -1260,7 +1260,7 @@ a {
 .era-slider-control b {
   color: var(--ink);
   font-size: 12px;
-  min-width: 34px;
+  min-width: 44px;
   text-align: right;
 }
 
@@ -1287,7 +1287,7 @@ a {
 .game-plan-team {
   border-top: 1px solid var(--line);
   display: grid;
-  grid-template-columns: minmax(140px, 0.7fr) repeat(5, minmax(120px, 1fr));
+  grid-template-columns: minmax(170px, 0.8fr) repeat(2, minmax(220px, 1fr));
   gap: 10px;
   padding-top: 10px;
   align-items: center;
@@ -1314,6 +1314,27 @@ a {
 
 .game-plan-team-title small {
   color: var(--muted);
+}
+
+.league-game-plan-controls {
+  gap: 12px;
+}
+
+.league-game-plan-header {
+  align-items: end;
+  display: grid;
+  grid-template-columns: minmax(220px, 320px) minmax(0, 1fr);
+}
+
+.league-plan-team-select {
+  margin: 0;
+}
+
+.league-plan-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .expected-line-panel {
@@ -4628,7 +4649,7 @@ tr:last-child td {
   }
 
   .game-plan-team {
-    grid-template-columns: minmax(180px, 0.8fr) repeat(2, minmax(150px, 1fr));
+    grid-template-columns: minmax(170px, 0.8fr) repeat(2, minmax(220px, 1fr));
   }
 }
 
@@ -4818,6 +4839,14 @@ tr:last-child td {
 
   .game-plan-header {
     display: grid;
+  }
+
+  .league-game-plan-header {
+    grid-template-columns: 1fr;
+  }
+
+  .league-plan-actions {
+    justify-content: flex-start;
   }
 
   .game-plan-team {
