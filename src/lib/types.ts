@@ -17,6 +17,7 @@ export interface EraContextOptions {
 
 export interface TeamGamePlanOptions {
   usageConcentration?: number;
+  playerUsageTargets?: Record<string, number>;
   threePointEmphasis?: number;
   foulPressure?: number;
   crashBoards?: number;

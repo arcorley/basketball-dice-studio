@@ -1337,6 +1337,67 @@ a {
   gap: 8px;
 }
 
+.player-usage-controls {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 10px;
+  padding-top: 10px;
+}
+
+.player-usage-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.player-usage-list {
+  display: grid;
+  gap: 8px;
+}
+
+.player-usage-row {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  border-radius: 8px;
+  display: grid;
+  grid-template-columns: minmax(210px, 0.9fr) minmax(260px, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+}
+
+.player-usage-row.adjusted {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+}
+
+.player-usage-player {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.player-usage-player span {
+  display: grid;
+  min-width: 0;
+}
+
+.player-usage-player strong,
+.player-usage-player small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.player-usage-player small {
+  color: var(--muted);
+}
+
+.player-usage-slider {
+  min-width: 0;
+}
+
 .expected-line-panel {
   display: grid;
   gap: 2px;
@@ -4651,6 +4712,15 @@ tr:last-child td {
   .game-plan-team {
     grid-template-columns: minmax(170px, 0.8fr) repeat(2, minmax(220px, 1fr));
   }
+
+  .player-usage-row {
+    grid-template-columns: minmax(190px, 0.8fr) minmax(240px, 1fr);
+  }
+
+  .player-usage-row .btn {
+    grid-column: 2;
+    justify-self: end;
+  }
 }
 
 @media (max-width: 980px) {
@@ -4851,6 +4921,15 @@ tr:last-child td {
 
   .game-plan-team {
     grid-template-columns: 1fr;
+  }
+
+  .player-usage-row {
+    grid-template-columns: 1fr;
+  }
+
+  .player-usage-row .btn {
+    grid-column: auto;
+    justify-self: start;
   }
 
   .options-bar {

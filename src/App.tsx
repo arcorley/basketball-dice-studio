@@ -72,6 +72,7 @@ import type {
   ExpectedMatchupLine,
   PossessionTrace,
   SimulationOptions,
+  SimIntensity,
   SourceCatalog,
   SourcePlayer,
   SourceTeamCatalogEntry,
@@ -118,6 +119,7 @@ function eraContextOptionsKey(options: Pick<MatchupOptions, "eraContext">): stri
 
 const neutralTeamGamePlan: Required<TeamGamePlanOptions> = {
   usageConcentration: 1,
+  playerUsageTargets: {},
   threePointEmphasis: 0,
   foulPressure: 0,
   crashBoards: 0,
@@ -125,8 +127,14 @@ const neutralTeamGamePlan: Required<TeamGamePlanOptions> = {
 };
 
 function normalizedTeamGamePlan(plan: TeamGamePlanOptions | undefined): Required<TeamGamePlanOptions> {
+  const playerUsageTargets = Object.fromEntries(
+    Object.entries(plan?.playerUsageTargets ?? {})
+      .filter(([playerId, target]) => playerId && Number.isFinite(target))
+      .map(([playerId, target]) => [playerId, clampNumber(target, 0, 0.6)])
+  );
   return {
     usageConcentration: clampNumber(plan?.usageConcentration ?? neutralTeamGamePlan.usageConcentration, 0.7, 1.4),
+    playerUsageTargets,
     threePointEmphasis: clampNumber(plan?.threePointEmphasis ?? neutralTeamGamePlan.threePointEmphasis, -10, 10),
     foulPressure: clampNumber(plan?.foulPressure ?? neutralTeamGamePlan.foulPressure, -6, 6),
     crashBoards: clampNumber(plan?.crashBoards ?? neutralTeamGamePlan.crashBoards, -6, 6),
@@ -138,6 +146,7 @@ function isNeutralTeamGamePlan(plan: TeamGamePlanOptions | undefined): boolean {
   const normalized = normalizedTeamGamePlan(plan);
   return (
     normalized.usageConcentration === neutralTeamGamePlan.usageConcentration &&
+    Object.keys(normalized.playerUsageTargets).length === 0 &&
     normalized.threePointEmphasis === neutralTeamGamePlan.threePointEmphasis &&
     normalized.foulPressure === neutralTeamGamePlan.foulPressure &&
     normalized.crashBoards === neutralTeamGamePlan.crashBoards &&
@@ -147,8 +156,13 @@ function isNeutralTeamGamePlan(plan: TeamGamePlanOptions | undefined): boolean {
 
 function teamGamePlanOptionsKey(plan: TeamGamePlanOptions | undefined): string {
   const normalized = normalizedTeamGamePlan(plan);
+  const playerUsageTargets = Object.entries(normalized.playerUsageTargets)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([playerId, target]) => `${playerId}:${target}`)
+    .join(";");
   return [
     normalized.usageConcentration,
+    playerUsageTargets,
     normalized.threePointEmphasis,
     normalized.foulPressure,
     normalized.crashBoards,
@@ -1001,6 +1015,20 @@ function signedLabel(value: number, digits = 1): string {
 
 function signedPoints(value: number): string {
   return value === 0 ? "0" : signedLabel(value, 0);
+}
+
+function basePlayerUseWeight(player: DicePlayerCard, intensity: SimIntensity): number {
+  return intensity === "playoff" ? player.playoffUseWeight : player.useWeight;
+}
+
+function basePlayerUsageShare(team: DiceTeamCard, player: DicePlayerCard, intensity: SimIntensity): number {
+  const total = team.players.reduce((sum, teammate) => sum + basePlayerUseWeight(teammate, intensity), 0);
+  return total > 0 ? basePlayerUseWeight(player, intensity) / total : 0;
+}
+
+function playerUsageTargetPct(plan: Required<TeamGamePlanOptions>, team: DiceTeamCard, player: DicePlayerCard, intensity: SimIntensity): number {
+  const target = plan.playerUsageTargets[player.id] ?? basePlayerUsageShare(team, player, intensity);
+  return Math.round(clampNumber(target, 0, 0.6) * 1000) / 10;
 }
 
 function shotProfileLabel(row: MatchupCard["awayPlayerRanges"][number]): string {
@@ -2279,7 +2307,9 @@ function MatchupOptionsControls({
           </Button>
         </div>
         <GamePlanSliders team={matchup.away} label="Away plan" plan={awayPlan} onChange={(plan) => setPlan("away", matchup.away.id, plan)} />
+        <PlayerUsageSliders team={matchup.away} plan={awayPlan} intensity={options.intensity} onChange={(plan) => setPlan("away", matchup.away.id, plan)} />
         <GamePlanSliders team={matchup.home} label="Home plan" plan={homePlan} onChange={(plan) => setPlan("home", matchup.home.id, plan)} />
+        <PlayerUsageSliders team={matchup.home} plan={homePlan} intensity={options.intensity} onChange={(plan) => setPlan("home", matchup.home.id, plan)} />
       </div>
     </div>
   );
@@ -2303,21 +2333,9 @@ function GamePlanSliders({
         <TeamLogo team={team} className="team-logo-mini" />
         <span>
           <strong>{label}</strong>
-          <small>{team.shortName}</small>
+          <small>{team.shortName} style</small>
         </span>
       </div>
-      <label className="era-slider-control">
-        <span>Usage</span>
-        <input
-          type="range"
-          min={70}
-          max={140}
-          step={5}
-          value={Math.round(plan.usageConcentration * 100)}
-          onChange={(event) => update("usageConcentration", Number(event.target.value) / 100)}
-        />
-        <b>{formatNumber(plan.usageConcentration, 2)}x</b>
-      </label>
       <label className="era-slider-control">
         <span>3PA</span>
         <input type="range" min={-10} max={10} step={1} value={plan.threePointEmphasis} onChange={(event) => update("threePointEmphasis", Number(event.target.value))} />
@@ -2338,6 +2356,74 @@ function GamePlanSliders({
         <input type="range" min={-6} max={6} step={1} value={plan.ballSecurity} onChange={(event) => update("ballSecurity", Number(event.target.value))} />
         <b>{signedPoints(plan.ballSecurity)}</b>
       </label>
+    </div>
+  );
+}
+
+function PlayerUsageSliders({
+  team,
+  plan,
+  intensity,
+  onChange
+}: {
+  team: DiceTeamCard;
+  plan: Required<TeamGamePlanOptions>;
+  intensity: SimIntensity;
+  onChange: (plan: Required<TeamGamePlanOptions>) => void;
+}) {
+  const players = [...team.players].sort((a, b) => basePlayerUsageShare(team, b, intensity) - basePlayerUsageShare(team, a, intensity));
+  const adjustedCount = Object.keys(plan.playerUsageTargets).filter((playerId) => team.players.some((player) => player.id === playerId)).length;
+  const updatePlayerUsage = (player: DicePlayerCard, targetPct: number) => {
+    const target = clampNumber(targetPct / 100, 0, 0.6);
+    const baseline = basePlayerUsageShare(team, player, intensity);
+    const playerUsageTargets = { ...plan.playerUsageTargets };
+    if (Math.abs(target - baseline) < 0.0025) {
+      delete playerUsageTargets[player.id];
+    } else {
+      playerUsageTargets[player.id] = target;
+    }
+    onChange(normalizedTeamGamePlan({ ...plan, playerUsageTargets }));
+  };
+  const resetPlayerUsage = (playerId: string) => {
+    const playerUsageTargets = { ...plan.playerUsageTargets };
+    delete playerUsageTargets[playerId];
+    onChange(normalizedTeamGamePlan({ ...plan, playerUsageTargets }));
+  };
+
+  return (
+    <div className="player-usage-controls">
+      <div className="player-usage-header">
+        <strong>{team.shortName} Player Usage</strong>
+        <span className="badge">{adjustedCount} adjusted</span>
+      </div>
+      <div className="player-usage-list">
+        {players.map((player) => {
+          const targetPct = playerUsageTargetPct(plan, team, player, intensity);
+          const baselinePct = basePlayerUsageShare(team, player, intensity) * 100;
+          const adjusted = plan.playerUsageTargets[player.id] !== undefined;
+          return (
+            <div key={player.id} className={`player-usage-row ${adjusted ? "adjusted" : ""}`}>
+              <span className="player-usage-player">
+                <PlayerPhoto player={player} className="player-photo-mini" />
+                <span>
+                  <strong>{player.name}</strong>
+                  <small>
+                    {player.position} · Base {formatNumber(baselinePct, 1)}%
+                  </small>
+                </span>
+              </span>
+              <label className="era-slider-control player-usage-slider">
+                <span>Target</span>
+                <input type="range" min={0} max={60} step={0.5} value={targetPct} onChange={(event) => updatePlayerUsage(player, Number(event.target.value))} />
+                <b>{formatNumber(targetPct, 1)}%</b>
+              </label>
+              <Button icon={<RotateCcw size={14} />} disabled={!adjusted} onClick={() => resetPlayerUsage(player.id)}>
+                Reset
+              </Button>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -4894,7 +4980,7 @@ function SeasonLeagueView({
               </div>
             </article>
           )}
-          <LeagueModelSettingsPanel league={league} teams={leagueTeamEntries} onChange={changeLeagueMatchupOptions} />
+          <LeagueModelSettingsPanel league={league} teams={leagueTeamEntries} loadTeam={loadTeam} onChange={changeLeagueMatchupOptions} />
           <div className="mode-tabs league-tabs">
             {!postseasonComplete && (
               <button type="button" className={activeSection === "schedule" ? "active" : ""} onClick={() => setSection("schedule")}>
@@ -6479,10 +6565,12 @@ function LeagueGameInfoModal({
 function LeagueModelSettingsPanel({
   league,
   teams,
+  loadTeam,
   onChange
 }: {
   league: LeagueState;
   teams: SourceTeamCatalogEntry[];
+  loadTeam: (teamId: string) => Promise<DiceTeamCard>;
   onChange: (options: MatchupOptions) => void;
 }) {
   const options = defaultLeagueMatchupOptions(league);
@@ -6492,7 +6580,10 @@ function LeagueModelSettingsPanel({
   const fixedSeason = eraContext.seasonEndYear ?? Math.round((minEraContextSeason + maxEraContextSeason) / 2);
   const tempoPct = Math.round((gameplay.tempoMultiplier ?? 1) * 100);
   const [activeTeamId, setActiveTeamId] = useState(league.focusTeamId ?? league.teamIds[0] ?? "");
+  const [activeTeamCard, setActiveTeamCard] = useState<DiceTeamCard | null>(null);
+  const [activeTeamLoadError, setActiveTeamLoadError] = useState<string | null>(null);
   const activeTeam = teams.find((team) => team.id === activeTeamId) ?? teams[0];
+  const activeVisualTeam = activeTeamCard ?? activeTeam;
   const activePlan = normalizedTeamGamePlan(activeTeam ? gameplay.teamPlans?.[activeTeam.id] : undefined);
   const adjustedTeamCount = league.teamIds.filter((teamId) => !isNeutralTeamGamePlan(gameplay.teamPlans?.[teamId])).length;
   const activePlanAdjusted = !isNeutralTeamGamePlan(activePlan);
@@ -6547,6 +6638,27 @@ function LeagueModelSettingsPanel({
     if (activeTeamId && league.teamIds.includes(activeTeamId)) return;
     setActiveTeamId(league.focusTeamId ?? league.teamIds[0] ?? "");
   }, [activeTeamId, league.focusTeamId, league.teamIds]);
+
+  useEffect(() => {
+    if (!activeTeam) {
+      setActiveTeamCard(null);
+      setActiveTeamLoadError(null);
+      return;
+    }
+    let mounted = true;
+    setActiveTeamCard(null);
+    setActiveTeamLoadError(null);
+    loadTeam(activeTeam.id)
+      .then((teamCard) => {
+        if (mounted) setActiveTeamCard(teamCard);
+      })
+      .catch((reason: unknown) => {
+        if (mounted) setActiveTeamLoadError(reason instanceof Error ? reason.message : String(reason));
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [activeTeam?.id, loadTeam]);
 
   return (
     <details className="panel setup-panel league-model-settings">
@@ -6653,7 +6765,10 @@ function LeagueModelSettingsPanel({
                 </Button>
               </div>
             </div>
-            <GamePlanSliders team={activeTeam} label="Team plan" plan={activePlan} onChange={(plan) => setTeamPlan(activeTeam.id, plan)} />
+            <GamePlanSliders team={activeVisualTeam} label="Team plan" plan={activePlan} onChange={(plan) => setTeamPlan(activeTeam.id, plan)} />
+            {activeTeamLoadError && <p className="form-error">{activeTeamLoadError}</p>}
+            {!activeTeamLoadError && !activeTeamCard && <p className="empty-state">Loading roster.</p>}
+            {activeTeamCard && <PlayerUsageSliders team={activeTeamCard} plan={activePlan} intensity={options.intensity} onChange={(plan) => setTeamPlan(activeTeam.id, plan)} />}
           </div>
         )}
       </div>

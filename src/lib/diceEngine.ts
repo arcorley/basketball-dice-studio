@@ -72,6 +72,7 @@ export const defaultMatchupOptions: MatchupOptions = {
 
 const defaultTeamGamePlan: Required<TeamGamePlanOptions> = {
   usageConcentration: 1,
+  playerUsageTargets: {},
   threePointEmphasis: 0,
   foulPressure: 0,
   crashBoards: 0,
@@ -222,8 +223,14 @@ export function normalizeMatchupOptions(options: Partial<MatchupOptions> = {}): 
 }
 
 function normalizeTeamGamePlan(plan: Partial<TeamGamePlanOptions> | undefined): Required<TeamGamePlanOptions> {
+  const playerUsageTargets = Object.fromEntries(
+    Object.entries(plan?.playerUsageTargets ?? {})
+      .filter(([playerId, target]) => playerId && Number.isFinite(target))
+      .map(([playerId, target]) => [playerId, clamp(target, 0, 0.6)])
+  );
   return {
     usageConcentration: clamp(plan?.usageConcentration ?? defaultTeamGamePlan.usageConcentration, 0.7, 1.4),
+    playerUsageTargets,
     threePointEmphasis: clamp(plan?.threePointEmphasis ?? defaultTeamGamePlan.threePointEmphasis, -10, 10),
     foulPressure: clamp(plan?.foulPressure ?? defaultTeamGamePlan.foulPressure, -6, 6),
     crashBoards: clamp(plan?.crashBoards ?? defaultTeamGamePlan.crashBoards, -6, 6),
@@ -273,8 +280,13 @@ function teamGamePlan(options: MatchupOptions, team: DiceTeamCard): Required<Tea
 
 function teamGamePlanCacheKey(plan: Partial<TeamGamePlanOptions> | undefined): string {
   const normalized = normalizeTeamGamePlan(plan);
+  const playerUsageTargets = Object.entries(normalized.playerUsageTargets)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([playerId, target]) => `${playerId}:${target}`)
+    .join(";");
   return [
     normalized.usageConcentration,
+    playerUsageTargets,
     normalized.threePointEmphasis,
     normalized.foulPressure,
     normalized.crashBoards,
@@ -822,7 +834,7 @@ function baseUseWeight(player: DicePlayerCard, options: MatchupOptions): number 
   return options.intensity === "playoff" ? player.playoffUseWeight : player.useWeight;
 }
 
-function contextualUseWeight(team: DiceTeamCard, player: DicePlayerCard, options: MatchupOptions): number {
+function contextualUseWeightBeforePlayerTargets(team: DiceTeamCard, player: DicePlayerCard, options: MatchupOptions): number {
   let useWeight = baseUseWeight(player, options);
   const averageUse = team.players.reduce((sum, teammate) => sum + baseUseWeight(teammate, options), 0) / Math.max(1, team.players.length);
   if (options.intensity === "playoff" && averageUse > 0) {
@@ -841,6 +853,26 @@ function contextualUseWeight(team: DiceTeamCard, player: DicePlayerCard, options
     useWeight *= clamp(relativeUse ** (concentration - 1), 0.55, 1.75);
   }
   return useWeight;
+}
+
+function playerUsageTargetMultiplier(baselineShare: number, targetShare: number): number {
+  const baselineOdds = clamp(baselineShare, 0.001, 0.95) / clamp(1 - baselineShare, 0.05, 0.999);
+  const targetOdds = clamp(targetShare, 0.001, 0.6) / clamp(1 - targetShare, 0.4, 0.999);
+  const rawMultiplier = clamp(targetOdds / baselineOdds, 0.05, 20);
+  const diminished = rawMultiplier >= 1 ? rawMultiplier ** 0.65 : 1 / ((1 / rawMultiplier) ** 0.65);
+  return clamp(diminished, 0.25, 3.5);
+}
+
+function contextualUseWeight(team: DiceTeamCard, player: DicePlayerCard, options: MatchupOptions): number {
+  const baselineWeight = contextualUseWeightBeforePlayerTargets(team, player, options);
+  const targetShare = teamGamePlan(options, team).playerUsageTargets[player.id];
+  if (targetShare === undefined) return baselineWeight;
+
+  const totalBaselineWeight = team.players.reduce((sum, teammate) => sum + contextualUseWeightBeforePlayerTargets(team, teammate, options), 0);
+  if (totalBaselineWeight <= 0) return baselineWeight;
+
+  const baselineShare = baselineWeight / totalBaselineWeight;
+  return baselineWeight * playerUsageTargetMultiplier(baselineShare, targetShare);
 }
 
 function useWeightedAverage(team: DiceTeamCard, options: MatchupOptions, value: (player: DicePlayerCard) => number): number {
