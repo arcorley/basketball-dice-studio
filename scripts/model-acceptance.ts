@@ -21,8 +21,10 @@ const args = new Map(
 const outputPath = path.resolve(args.get("output") ?? path.join(process.cwd(), "reports", "model-acceptance.json"));
 const markdownPath = path.resolve(args.get("markdown") ?? outputPath.replace(/\.json$/i, ".md"));
 const crossEraReport = path.resolve(args.get("cross-era-report") ?? path.join(process.cwd(), "reports", "cross-era-model-current-240x50-seed-7777.json"));
+const residualDiagnosticsOutput = path.resolve(args.get("residual-diagnostics-output") ?? path.join(process.cwd(), "reports", "model-acceptance-residual-diagnostics.json"));
 const sameEraOutput = path.resolve(args.get("same-era-output") ?? path.join(process.cwd(), "reports", "model-acceptance-same-era.json"));
 const expectedPlayersOutput = path.resolve(args.get("expected-players-output") ?? path.join(process.cwd(), "reports", "model-acceptance-expected-players.json"));
+const playerConvergenceOutput = path.resolve(args.get("player-convergence-output") ?? path.join(process.cwd(), "reports", "model-acceptance-player-convergence.json"));
 const leverOutput = path.resolve(args.get("lever-output") ?? path.join(process.cwd(), "reports", "model-acceptance-gameplay-levers.json"));
 
 const sameEraPairsPerSeason = integerArg("same-era-pairs-per-season", 2);
@@ -30,6 +32,9 @@ const sameEraGamesPerPair = integerArg("same-era-games-per-pair", 60);
 const sameEraSeed = integerArg("same-era-seed", 6262);
 const expectedPlayersPairs = integerArg("expected-players-pairs", 80);
 const expectedPlayersSeed = integerArg("expected-players-seed", 7373);
+const playerConvergencePairsPerBucket = integerArg("player-convergence-pairs-per-bucket", 1);
+const playerConvergenceGamesPerPair = integerArg("player-convergence-games-per-pair", 120);
+const playerConvergenceSeed = integerArg("player-convergence-seed", 8383);
 const leverPairsPerBucket = integerArg("lever-pairs-per-bucket", 2);
 const leverGamesPerScenario = integerArg("lever-games-per-scenario", 80);
 const leverSeed = integerArg("lever-seed", 9292);
@@ -121,6 +126,22 @@ steps.push(
 
 steps.push(
   runStep(
+    "residual-heterogeneity",
+    "Residual heterogeneity diagnostics",
+    [
+      npmCommand,
+      "run",
+      "diagnose:model-residuals",
+      "--",
+      `--report=${crossEraReport}`,
+      `--output=${residualDiagnosticsOutput}`
+    ],
+    args.get("skip-residual-diagnostics") === "true"
+  )
+);
+
+steps.push(
+  runStep(
     "same-era-calibration",
     "Same-era calibration",
     [
@@ -156,6 +177,24 @@ steps.push(
 
 steps.push(
   runStep(
+    "player-sim-convergence",
+    "Player sim convergence",
+    [
+      npmCommand,
+      "run",
+      "validate:player-convergence",
+      "--",
+      `--pairs-per-bucket=${playerConvergencePairsPerBucket}`,
+      `--games-per-pair=${playerConvergenceGamesPerPair}`,
+      `--seed=${playerConvergenceSeed}`,
+      `--output=${playerConvergenceOutput}`
+    ],
+    args.get("skip-player-convergence") === "true"
+  )
+);
+
+steps.push(
+  runStep(
     "gameplay-lever-smoke",
     "Gameplay lever smoke",
     [
@@ -177,8 +216,10 @@ const report = {
   generatedAt: new Date().toISOString(),
   status,
   crossEraReport: path.relative(process.cwd(), crossEraReport),
+  residualDiagnosticsOutput: path.relative(process.cwd(), residualDiagnosticsOutput),
   sameEraOutput: path.relative(process.cwd(), sameEraOutput),
   expectedPlayersOutput: path.relative(process.cwd(), expectedPlayersOutput),
+  playerConvergenceOutput: path.relative(process.cwd(), playerConvergenceOutput),
   leverOutput: path.relative(process.cwd(), leverOutput),
   steps
 };

@@ -1,0 +1,843 @@
+{
+  "generatedAt": "2026-06-27T01:52:55.641Z",
+  "inputReport": "reports/cross-era-model-current-240x50-seed-7777.json",
+  "run": {
+    "modelVersion": "cross-era-midpoint-v1",
+    "seed": 7777,
+    "pairsPerBucket": 240,
+    "gamesPerPair": 50,
+    "pairCount": 1200,
+    "elapsedSeconds": 0.1
+  },
+  "thresholds": {
+    "minPairs": 50,
+    "maxGroupMarginBias": 0.85,
+    "maxGroupPtsBias": 0.75,
+    "maxGroupFgaBias": 0.65,
+    "maxGroupThreePaBias": 0.6,
+    "maxGroupFtaBias": 0.65,
+    "maxGroupTovBias": 0.35,
+    "maxGroupOrbBias": 0.35,
+    "maxTeamLinePtsBias": 0.45,
+    "maxTeamLineFgaBias": 0.45,
+    "maxTeamLineThreePaBias": 0.35,
+    "maxTeamLineFtaBias": 0.45,
+    "maxTeamLineTovBias": 0.25,
+    "maxTeamLineOrbBias": 0.25
+  },
+  "status": "pass",
+  "groups": [
+    {
+      "id": "all",
+      "label": "Overall",
+      "kind": "overall",
+      "pairCount": 1200,
+      "gameCount": 60000,
+      "avgGap": 12.58,
+      "newerWinRate": 0.5104,
+      "newerAvgMargin": 0.4743,
+      "expectedNewerAvgMargin": 0.4201,
+      "simMinusExpectedMargin": 0.0542,
+      "pairRelativeBias": {
+        "pts": 0.0542,
+        "fga": 0.0382,
+        "threePa": 0.0228,
+        "fta": -0.0109,
+        "tov": 0.0087,
+        "orb": 0.0315
+      },
+      "teamLineSimMinusExpected": {
+        "pts": 0.2072,
+        "fga": 0.2327,
+        "threePa": 0.1229,
+        "fta": 0.0177,
+        "tov": 0.0182,
+        "orb": 0.0248
+      },
+      "failures": []
+    },
+    {
+      "id": "gap-1-4-years",
+      "label": "Gap 1-4 years",
+      "kind": "gap",
+      "pairCount": 240,
+      "gameCount": 12000,
+      "avgGap": 2.36,
+      "newerWinRate": 0.5072,
+      "newerAvgMargin": 0.2554,
+      "expectedNewerAvgMargin": 0.0963,
+      "simMinusExpectedMargin": 0.1591,
+      "pairRelativeBias": {
+        "pts": 0.1591,
+        "fga": 0.0151,
+        "threePa": -0.0164,
+        "fta": 0.0357,
+        "tov": 0.0486,
+        "orb": 0.0253
+      },
+      "teamLineSimMinusExpected": {
+        "pts": 0.1356,
+        "fga": 0.1738,
+        "threePa": 0.1082,
+        "fta": -0.0255,
+        "tov": 0.0205,
+        "orb": -0.0194
+      },
+      "failures": []
+    },
+    {
+      "id": "gap-5-9-years",
+      "label": "Gap 5-9 years",
+      "kind": "gap",
+      "pairCount": 240,
+      "gameCount": 12000,
+      "avgGap": 6.89,
+      "newerWinRate": 0.5061,
+      "newerAvgMargin": 0.2817,
+      "expectedNewerAvgMargin": 0.2304,
+      "simMinusExpectedMargin": 0.0512,
+      "pairRelativeBias": {
+        "pts": 0.0512,
+        "fga": 0.0671,
+        "threePa": -0.027,
+        "fta": 0.0313,
+        "tov": -0.022,
+        "orb": 0.0523
+      },
+      "teamLineSimMinusExpected": {
+        "pts": 0.2311,
+        "fga": 0.2521,
+        "threePa": 0.1595,
+        "fta": 0.0588,
+        "tov": 0.0152,
+        "orb": 0.0379
+      },
+      "failures": []
+    },
+    {
+      "id": "gap-10-14-years",
+      "label": "Gap 10-14 years",
+      "kind": "gap",
+      "pairCount": 240,
+      "gameCount": 12000,
+      "avgGap": 11.95,
+      "newerWinRate": 0.526,
+      "newerAvgMargin": 1.0211,
+      "expectedNewerAvgMargin": 1.1909,
+      "simMinusExpectedMargin": -0.1698,
+      "pairRelativeBias": {
+        "pts": -0.1697,
+        "fga": 0.0822,
+        "threePa": 0.0669,
+        "fta": -0.0136,
+        "tov": 0.0451,
+        "orb": 0.1072
+      },
+      "teamLineSimMinusExpected": {
+        "pts": 0.2771,
+        "fga": 0.3075,
+        "threePa": 0.1405,
+        "fta": 0.0106,
+        "tov": 0.011,
+        "orb": 0.0714
+      },
+      "failures": []
+    },
+    {
+      "id": "gap-15-19-years",
+      "label": "Gap 15-19 years",
+      "kind": "gap",
+      "pairCount": 240,
+      "gameCount": 12000,
+      "avgGap": 16.96,
+      "newerWinRate": 0.5237,
+      "newerAvgMargin": 1.2704,
+      "expectedNewerAvgMargin": 1.2375,
+      "simMinusExpectedMargin": 0.0329,
+      "pairRelativeBias": {
+        "pts": 0.0329,
+        "fga": -0.0154,
+        "threePa": 0.0372,
+        "fta": -0.1153,
+        "tov": 0.0301,
+        "orb": 0.0076
+      },
+      "teamLineSimMinusExpected": {
+        "pts": 0.1291,
+        "fga": 0.1915,
+        "threePa": 0.087,
+        "fta": 0.0465,
+        "tov": 0.0306,
+        "orb": 0.0105
+      },
+      "failures": []
+    },
+    {
+      "id": "gap-20-years",
+      "label": "Gap 20+ years",
+      "kind": "gap",
+      "pairCount": 240,
+      "gameCount": 12000,
+      "avgGap": 24.76,
+      "newerWinRate": 0.4888,
+      "newerAvgMargin": -0.4572,
+      "expectedNewerAvgMargin": -0.6548,
+      "simMinusExpectedMargin": 0.1975,
+      "pairRelativeBias": {
+        "pts": 0.1975,
+        "fga": 0.0418,
+        "threePa": 0.0535,
+        "fta": 0.0075,
+        "tov": -0.0583,
+        "orb": -0.0348
+      },
+      "teamLineSimMinusExpected": {
+        "pts": 0.2633,
+        "fga": 0.2386,
+        "threePa": 0.1192,
+        "fta": -0.0019,
+        "tov": 0.0138,
+        "orb": 0.0235
+      },
+      "failures": []
+    },
+    {
+      "id": "era-newer-2010s",
+      "label": "Newer 2010s",
+      "kind": "newer-era",
+      "pairCount": 494,
+      "gameCount": 24700,
+      "avgGap": 13.08,
+      "newerWinRate": 0.5005,
+      "newerAvgMargin": 0.0661,
+      "expectedNewerAvgMargin": 0.0643,
+      "simMinusExpectedMargin": 0.0018,
+      "pairRelativeBias": {
+        "pts": 0.0016,
+        "fga": -0.0299,
+        "threePa": 0.0358,
+        "fta": 0.0147,
+        "tov": 0.0372,
+        "orb": 0.0066
+      },
+      "teamLineSimMinusExpected": {
+        "pts": 0.2042,
+        "fga": 0.2426,
+        "threePa": 0.1285,
+        "fta": 0.0184,
+        "tov": 0.0089,
+        "orb": 0.0345
+      },
+      "failures": []
+    },
+    {
+      "id": "era-newer-2000s",
+      "label": "Newer 2000s",
+      "kind": "newer-era",
+      "pairCount": 276,
+      "gameCount": 13800,
+      "avgGap": 8.67,
+      "newerWinRate": 0.53,
+      "newerAvgMargin": 1.2653,
+      "expectedNewerAvgMargin": 1.2544,
+      "simMinusExpectedMargin": 0.0109,
+      "pairRelativeBias": {
+        "pts": 0.0109,
+        "fga": 0.0678,
+        "threePa": -0.014,
+        "fta": -0.1301,
+        "tov": 0.0278,
+        "orb": 0.0356
+      },
+      "teamLineSimMinusExpected": {
+        "pts": 0.2222,
+        "fga": 0.2449,
+        "threePa": 0.0834,
+        "fta": 0.0397,
+        "tov": 0.0355,
+        "orb": 0.0382
+      },
+      "failures": []
+    },
+    {
+      "id": "era-newer-1990s",
+      "label": "Newer 1990s",
+      "kind": "newer-era",
+      "pairCount": 68,
+      "gameCount": 3400,
+      "avgGap": 3.68,
+      "newerWinRate": 0.5003,
+      "newerAvgMargin": -0.0294,
+      "expectedNewerAvgMargin": -0.07,
+      "simMinusExpectedMargin": 0.0406,
+      "pairRelativeBias": {
+        "pts": 0.0412,
+        "fga": 0.2918,
+        "threePa": 0.111,
+        "fta": -0.1644,
+        "tov": -0.02,
+        "orb": 0.1721
+      },
+      "teamLineSimMinusExpected": {
+        "pts": 0.0729,
+        "fga": 0.2526,
+        "threePa": 0.1001,
+        "fta": -0.0075,
+        "tov": -0.0094,
+        "orb": 0.0351
+      },
+      "failures": []
+    },
+    {
+      "id": "era-newer-2020s",
+      "label": "Newer 2020s",
+      "kind": "newer-era",
+      "pairCount": 362,
+      "gameCount": 18100,
+      "avgGap": 16.56,
+      "newerWinRate": 0.5107,
+      "newerAvgMargin": 0.5228,
+      "expectedNewerAvgMargin": 0.3615,
+      "simMinusExpectedMargin": 0.1613,
+      "pairRelativeBias": {
+        "pts": 0.1614,
+        "fga": 0.0608,
+        "threePa": 0.0167,
+        "fta": 0.074,
+        "tov": -0.0394,
+        "orb": 0.0361
+      },
+      "teamLineSimMinusExpected": {
+        "pts": 0.2252,
+        "fga": 0.2062,
+        "threePa": 0.1496,
+        "fta": 0.0047,
+        "tov": 0.0229,
+        "orb": -0.0007
+      },
+      "failures": []
+    },
+    {
+      "id": "card-power-low",
+      "label": "Card power delta: low",
+      "kind": "card-power",
+      "pairCount": 400,
+      "gameCount": 20000,
+      "avgGap": 12.52,
+      "newerWinRate": 0.3187,
+      "newerAvgMargin": -7.6864,
+      "expectedNewerAvgMargin": -7.6475,
+      "simMinusExpectedMargin": -0.0389,
+      "pairRelativeBias": {
+        "pts": -0.0392,
+        "fga": -0.0234,
+        "threePa": -0.0429,
+        "fta": 0.0809,
+        "tov": -0.001,
+        "orb": 0.0025
+      },
+      "teamLineSimMinusExpected": {
+        "pts": 0.1598,
+        "fga": 0.2021,
+        "threePa": 0.1101,
+        "fta": 0.0241,
+        "tov": 0.0319,
+        "orb": 0.0237
+      },
+      "failures": []
+    },
+    {
+      "id": "card-power-mid",
+      "label": "Card power delta: middle",
+      "kind": "card-power",
+      "pairCount": 400,
+      "gameCount": 20000,
+      "avgGap": 12.87,
+      "newerWinRate": 0.5079,
+      "newerAvgMargin": 0.2838,
+      "expectedNewerAvgMargin": 0.3106,
+      "simMinusExpectedMargin": -0.0268,
+      "pairRelativeBias": {
+        "pts": -0.0265,
+        "fga": 0.0626,
+        "threePa": 0.0618,
+        "fta": -0.088,
+        "tov": 0.005,
+        "orb": 0.0278
+      },
+      "teamLineSimMinusExpected": {
+        "pts": 0.2479,
+        "fga": 0.2584,
+        "threePa": 0.153,
+        "fta": -0.021,
+        "tov": 0.0196,
+        "orb": 0.0229
+      },
+      "failures": []
+    },
+    {
+      "id": "card-power-high",
+      "label": "Card power delta: high",
+      "kind": "card-power",
+      "pairCount": 400,
+      "gameCount": 20000,
+      "avgGap": 12.36,
+      "newerWinRate": 0.7045,
+      "newerAvgMargin": 8.8254,
+      "expectedNewerAvgMargin": 8.5971,
+      "simMinusExpectedMargin": 0.2283,
+      "pairRelativeBias": {
+        "pts": 0.2283,
+        "fga": 0.0752,
+        "threePa": 0.0497,
+        "fta": -0.0254,
+        "tov": 0.0221,
+        "orb": 0.0644
+      },
+      "teamLineSimMinusExpected": {
+        "pts": 0.214,
+        "fga": 0.2377,
+        "threePa": 0.1056,
+        "fta": 0.05,
+        "tov": 0.0032,
+        "orb": 0.0278
+      },
+      "failures": []
+    },
+    {
+      "id": "three-delta-low",
+      "label": "3PA target delta: low",
+      "kind": "style-three",
+      "pairCount": 400,
+      "gameCount": 20000,
+      "avgGap": 7.04,
+      "newerWinRate": 0.4772,
+      "newerAvgMargin": -1.0738,
+      "expectedNewerAvgMargin": -1.1253,
+      "simMinusExpectedMargin": 0.0515,
+      "pairRelativeBias": {
+        "pts": 0.0514,
+        "fga": 0.0129,
+        "threePa": 0.0039,
+        "fta": 0.0741,
+        "tov": -0.0112,
+        "orb": 0.0217
+      },
+      "teamLineSimMinusExpected": {
+        "pts": 0.218,
+        "fga": 0.2081,
+        "threePa": 0.1257,
+        "fta": 0.0596,
+        "tov": 0.0246,
+        "orb": 0.0261
+      },
+      "failures": []
+    },
+    {
+      "id": "three-delta-mid",
+      "label": "3PA target delta: middle",
+      "kind": "style-three",
+      "pairCount": 400,
+      "gameCount": 20000,
+      "avgGap": 11.61,
+      "newerWinRate": 0.5206,
+      "newerAvgMargin": 0.8426,
+      "expectedNewerAvgMargin": 0.8551,
+      "simMinusExpectedMargin": -0.0126,
+      "pairRelativeBias": {
+        "pts": -0.0121,
+        "fga": 0.0683,
+        "threePa": -0.0067,
+        "fta": -0.0954,
+        "tov": 0.0516,
+        "orb": 0.0675
+      },
+      "teamLineSimMinusExpected": {
+        "pts": 0.2049,
+        "fga": 0.2727,
+        "threePa": 0.1255,
+        "fta": -0.0063,
+        "tov": 0.0096,
+        "orb": 0.0357
+      },
+      "failures": []
+    },
+    {
+      "id": "three-delta-high",
+      "label": "3PA target delta: high",
+      "kind": "style-three",
+      "pairCount": 400,
+      "gameCount": 20000,
+      "avgGap": 19.1,
+      "newerWinRate": 0.5333,
+      "newerAvgMargin": 1.654,
+      "expectedNewerAvgMargin": 1.5304,
+      "simMinusExpectedMargin": 0.1236,
+      "pairRelativeBias": {
+        "pts": 0.1233,
+        "fga": 0.0332,
+        "threePa": 0.0714,
+        "fta": -0.0113,
+        "tov": -0.0143,
+        "orb": 0.0054
+      },
+      "teamLineSimMinusExpected": {
+        "pts": 0.1988,
+        "fga": 0.2173,
+        "threePa": 0.1175,
+        "fta": -0.0002,
+        "tov": 0.0205,
+        "orb": 0.0126
+      },
+      "failures": []
+    },
+    {
+      "id": "foul-delta-low",
+      "label": "FTA target delta: low",
+      "kind": "style-foul",
+      "pairCount": 400,
+      "gameCount": 20000,
+      "avgGap": 16.25,
+      "newerWinRate": 0.4496,
+      "newerAvgMargin": -2.1587,
+      "expectedNewerAvgMargin": -2.1867,
+      "simMinusExpectedMargin": 0.0279,
+      "pairRelativeBias": {
+        "pts": 0.0279,
+        "fga": 0.0476,
+        "threePa": 0.0684,
+        "fta": -0.0186,
+        "tov": -0.0217,
+        "orb": 0.0197
+      },
+      "teamLineSimMinusExpected": {
+        "pts": 0.2468,
+        "fga": 0.2323,
+        "threePa": 0.1356,
+        "fta": 0.0131,
+        "tov": 0.0192,
+        "orb": 0.0238
+      },
+      "failures": []
+    },
+    {
+      "id": "foul-delta-mid",
+      "label": "FTA target delta: middle",
+      "kind": "style-foul",
+      "pairCount": 400,
+      "gameCount": 20000,
+      "avgGap": 11.39,
+      "newerWinRate": 0.5073,
+      "newerAvgMargin": 0.3718,
+      "expectedNewerAvgMargin": 0.2379,
+      "simMinusExpectedMargin": 0.1338,
+      "pairRelativeBias": {
+        "pts": 0.1337,
+        "fga": 0.0548,
+        "threePa": -0.0031,
+        "fta": 0.0232,
+        "tov": 0.019,
+        "orb": 0.042
+      },
+      "teamLineSimMinusExpected": {
+        "pts": 0.2072,
+        "fga": 0.2246,
+        "threePa": 0.106,
+        "fta": 0.0202,
+        "tov": 0.0346,
+        "orb": 0.0309
+      },
+      "failures": []
+    },
+    {
+      "id": "foul-delta-high",
+      "label": "FTA target delta: high",
+      "kind": "style-foul",
+      "pairCount": 400,
+      "gameCount": 20000,
+      "avgGap": 10.1,
+      "newerWinRate": 0.5743,
+      "newerAvgMargin": 3.2098,
+      "expectedNewerAvgMargin": 3.209,
+      "simMinusExpectedMargin": 0.0008,
+      "pairRelativeBias": {
+        "pts": 0.001,
+        "fga": 0.012,
+        "threePa": 0.0032,
+        "fta": -0.0372,
+        "tov": 0.0289,
+        "orb": 0.033
+      },
+      "teamLineSimMinusExpected": {
+        "pts": 0.1677,
+        "fga": 0.2412,
+        "threePa": 0.127,
+        "fta": 0.0198,
+        "tov": 0.0008,
+        "orb": 0.0197
+      },
+      "failures": []
+    },
+    {
+      "id": "tov-delta-low",
+      "label": "TOV target delta: low",
+      "kind": "style-tov",
+      "pairCount": 400,
+      "gameCount": 20000,
+      "avgGap": 13.67,
+      "newerWinRate": 0.5665,
+      "newerAvgMargin": 2.7109,
+      "expectedNewerAvgMargin": 2.6793,
+      "simMinusExpectedMargin": 0.0316,
+      "pairRelativeBias": {
+        "pts": 0.0318,
+        "fga": 0.1225,
+        "threePa": 0.0563,
+        "fta": -0.0532,
+        "tov": -0.0065,
+        "orb": 0.0732
+      },
+      "teamLineSimMinusExpected": {
+        "pts": 0.1585,
+        "fga": 0.2344,
+        "threePa": 0.1495,
+        "fta": 0.0046,
+        "tov": 0.0082,
+        "orb": 0.0148
+      },
+      "failures": []
+    },
+    {
+      "id": "tov-delta-mid",
+      "label": "TOV target delta: middle",
+      "kind": "style-tov",
+      "pairCount": 400,
+      "gameCount": 20000,
+      "avgGap": 12.43,
+      "newerWinRate": 0.5285,
+      "newerAvgMargin": 1.2751,
+      "expectedNewerAvgMargin": 1.1866,
+      "simMinusExpectedMargin": 0.0885,
+      "pairRelativeBias": {
+        "pts": 0.0885,
+        "fga": 0.0309,
+        "threePa": 0.0394,
+        "fta": -0.0202,
+        "tov": 0.0261,
+        "orb": 0.0272
+      },
+      "teamLineSimMinusExpected": {
+        "pts": 0.2798,
+        "fga": 0.2417,
+        "threePa": 0.1178,
+        "fta": 0.0331,
+        "tov": 0.0239,
+        "orb": 0.0396
+      },
+      "failures": []
+    },
+    {
+      "id": "tov-delta-high",
+      "label": "TOV target delta: high",
+      "kind": "style-tov",
+      "pairCount": 400,
+      "gameCount": 20000,
+      "avgGap": 11.64,
+      "newerWinRate": 0.436,
+      "newerAvgMargin": -2.5631,
+      "expectedNewerAvgMargin": -2.6057,
+      "simMinusExpectedMargin": 0.0425,
+      "pairRelativeBias": {
+        "pts": 0.0423,
+        "fga": -0.0389,
+        "threePa": -0.0272,
+        "fta": 0.0409,
+        "tov": 0.0064,
+        "orb": -0.0058
+      },
+      "teamLineSimMinusExpected": {
+        "pts": 0.1835,
+        "fga": 0.222,
+        "threePa": 0.1013,
+        "fta": 0.0154,
+        "tov": 0.0226,
+        "orb": 0.0199
+      },
+      "failures": []
+    },
+    {
+      "id": "orb-delta-low",
+      "label": "ORB chance delta: low",
+      "kind": "style-orb",
+      "pairCount": 400,
+      "gameCount": 20000,
+      "avgGap": 16.25,
+      "newerWinRate": 0.4767,
+      "newerAvgMargin": -0.8841,
+      "expectedNewerAvgMargin": -0.8545,
+      "simMinusExpectedMargin": -0.0297,
+      "pairRelativeBias": {
+        "pts": -0.0299,
+        "fga": 0.0746,
+        "threePa": -0.0075,
+        "fta": -0.1004,
+        "tov": -0.0318,
+        "orb": 0.0165
+      },
+      "teamLineSimMinusExpected": {
+        "pts": 0.22,
+        "fga": 0.21,
+        "threePa": 0.1213,
+        "fta": 0.0085,
+        "tov": 0.0378,
+        "orb": 0.0038
+      },
+      "failures": []
+    },
+    {
+      "id": "orb-delta-mid",
+      "label": "ORB chance delta: middle",
+      "kind": "style-orb",
+      "pairCount": 400,
+      "gameCount": 20000,
+      "avgGap": 11.19,
+      "newerWinRate": 0.5028,
+      "newerAvgMargin": 0.0693,
+      "expectedNewerAvgMargin": -0.1239,
+      "simMinusExpectedMargin": 0.1931,
+      "pairRelativeBias": {
+        "pts": 0.1931,
+        "fga": 0.0203,
+        "threePa": 0.0515,
+        "fta": 0.0317,
+        "tov": -0.0065,
+        "orb": 0.0138
+      },
+      "teamLineSimMinusExpected": {
+        "pts": 0.2538,
+        "fga": 0.2272,
+        "threePa": 0.1106,
+        "fta": 0.0184,
+        "tov": 0.0238,
+        "orb": 0.016
+      },
+      "failures": []
+    },
+    {
+      "id": "orb-delta-high",
+      "label": "ORB chance delta: high",
+      "kind": "style-orb",
+      "pairCount": 400,
+      "gameCount": 20000,
+      "avgGap": 10.31,
+      "newerWinRate": 0.5516,
+      "newerAvgMargin": 2.2376,
+      "expectedNewerAvgMargin": 2.2385,
+      "simMinusExpectedMargin": -0.0009,
+      "pairRelativeBias": {
+        "pts": -0.0006,
+        "fga": 0.0196,
+        "threePa": 0.0245,
+        "fta": 0.0362,
+        "tov": 0.0644,
+        "orb": 0.0642
+      },
+      "teamLineSimMinusExpected": {
+        "pts": 0.1479,
+        "fga": 0.261,
+        "threePa": 0.1367,
+        "fta": 0.0262,
+        "tov": -0.0069,
+        "orb": 0.0545
+      },
+      "failures": []
+    },
+    {
+      "id": "shot-delta-low",
+      "label": "Shot adjustment delta: low",
+      "kind": "style-shot",
+      "pairCount": 400,
+      "gameCount": 20000,
+      "avgGap": 12.49,
+      "newerWinRate": 0.3117,
+      "newerAvgMargin": -7.9234,
+      "expectedNewerAvgMargin": -7.9105,
+      "simMinusExpectedMargin": -0.0129,
+      "pairRelativeBias": {
+        "pts": -0.0133,
+        "fga": -0.0026,
+        "threePa": -0.0659,
+        "fta": 0.0499,
+        "tov": -0.0034,
+        "orb": 0.0193
+      },
+      "teamLineSimMinusExpected": {
+        "pts": 0.1373,
+        "fga": 0.2013,
+        "threePa": 0.1221,
+        "fta": -0.005,
+        "tov": 0.03,
+        "orb": 0.0155
+      },
+      "failures": []
+    },
+    {
+      "id": "shot-delta-mid",
+      "label": "Shot adjustment delta: middle",
+      "kind": "style-shot",
+      "pairCount": 400,
+      "gameCount": 20000,
+      "avgGap": 13.09,
+      "newerWinRate": 0.5087,
+      "newerAvgMargin": 0.2362,
+      "expectedNewerAvgMargin": 0.2577,
+      "simMinusExpectedMargin": -0.0215,
+      "pairRelativeBias": {
+        "pts": -0.0211,
+        "fga": 0.0612,
+        "threePa": 0.0869,
+        "fta": -0.041,
+        "tov": 0.0099,
+        "orb": 0.0366
+      },
+      "teamLineSimMinusExpected": {
+        "pts": 0.2964,
+        "fga": 0.2777,
+        "threePa": 0.1513,
+        "fta": 0.0241,
+        "tov": 0.0131,
+        "orb": 0.0436
+      },
+      "failures": []
+    },
+    {
+      "id": "shot-delta-high",
+      "label": "Shot adjustment delta: high",
+      "kind": "style-shot",
+      "pairCount": 400,
+      "gameCount": 20000,
+      "avgGap": 12.17,
+      "newerWinRate": 0.7107,
+      "newerAvgMargin": 9.11,
+      "expectedNewerAvgMargin": 8.913,
+      "simMinusExpectedMargin": 0.197,
+      "pairRelativeBias": {
+        "pts": 0.197,
+        "fga": 0.0558,
+        "threePa": 0.0476,
+        "fta": -0.0415,
+        "tov": 0.0196,
+        "orb": 0.0388
+      },
+      "teamLineSimMinusExpected": {
+        "pts": 0.188,
+        "fga": 0.2191,
+        "threePa": 0.0952,
+        "fta": 0.034,
+        "tov": 0.0116,
+        "orb": 0.0153
+      },
+      "failures": []
+    }
+  ]
+}

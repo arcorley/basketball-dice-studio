@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-27T01:35:20.681Z",
+  "generatedAt": "2026-06-27T01:53:27.180Z",
   "run": {
     "modelVersion": "cross-era-midpoint-v1",
     "seed": 6262,
@@ -15,7 +15,7 @@
         "mode": "midpoint"
       }
     },
-    "elapsedSeconds": 14
+    "elapsedSeconds": 14.1
   },
   "thresholds": {
     "maxSimExpectedPtsMeanAbs": 1.5,

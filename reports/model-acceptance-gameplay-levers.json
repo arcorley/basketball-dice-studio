@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-27T01:35:51.011Z",
+  "generatedAt": "2026-06-27T01:54:06.371Z",
   "run": {
     "modelVersion": "cross-era-midpoint-v1",
     "seed": 9292,
@@ -7,7 +7,7 @@
     "gamesPerScenario": 80,
     "pairCount": 10,
     "scenarioCount": 9,
-    "elapsedSeconds": 27.1
+    "elapsedSeconds": 27.4
   },
   "thresholds": {
     "tempo-plus-10": {

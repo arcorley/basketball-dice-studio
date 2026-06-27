@@ -1,9 +1,11 @@
 {
-  "generatedAt": "2026-06-27T01:35:51.045Z",
+  "generatedAt": "2026-06-27T01:54:06.407Z",
   "status": "pass",
   "crossEraReport": "reports/cross-era-model-current-240x50-seed-7777.json",
+  "residualDiagnosticsOutput": "reports/model-acceptance-residual-diagnostics.json",
   "sameEraOutput": "reports/model-acceptance-same-era.json",
   "expectedPlayersOutput": "reports/model-acceptance-expected-players.json",
+  "playerConvergenceOutput": "reports/model-acceptance-player-convergence.json",
   "leverOutput": "reports/model-acceptance-gameplay-levers.json",
   "steps": [
     {
@@ -21,6 +23,21 @@
       "output": "> basketball-dice-studio@1.0.8 validate:cross-era\n> tsx scripts/validate-cross-era-report.ts --report=/Users/austin/wp/basketball-dice-studio/reports/cross-era-model-current-240x50-seed-7777.json\n\nPASS: reports/cross-era-model-current-240x50-seed-7777.json\nModel cross-era-midpoint-v1, seed=7777, pairsPerBucket=240, gamesPerPair=50\ngapCoefficients: sim=-0.0048, expected=-0.0075, winRate=-0.0003; nearEqualWin=0.5101, overallWin=0.5104\nsimMinusExpectedBias: PTS=0.05, FGA=0.04, FTA=-0.01, TOV=0.01, ORB=0.03"
     },
     {
+      "id": "residual-heterogeneity",
+      "label": "Residual heterogeneity diagnostics",
+      "command": [
+        "npm",
+        "run",
+        "diagnose:model-residuals",
+        "--",
+        "--report=/Users/austin/wp/basketball-dice-studio/reports/cross-era-model-current-240x50-seed-7777.json",
+        "--output=/Users/austin/wp/basketball-dice-studio/reports/model-acceptance-residual-diagnostics.json"
+      ],
+      "status": "pass",
+      "elapsedSeconds": 0.7,
+      "output": "> basketball-dice-studio@1.0.8 diagnose:model-residuals\n> tsx scripts/diagnose-model-residuals.ts --report=/Users/austin/wp/basketball-dice-studio/reports/cross-era-model-current-240x50-seed-7777.json --output=/Users/austin/wp/basketball-dice-studio/reports/model-acceptance-residual-diagnostics.json\n\nPASS: reports/model-acceptance-residual-diagnostics.json\nMarkdown summary: reports/model-acceptance-residual-diagnostics.md\nGroups: 28; failures=0"
+    },
+    {
       "id": "same-era-calibration",
       "label": "Same-era calibration",
       "command": [
@@ -34,8 +51,8 @@
         "--output=/Users/austin/wp/basketball-dice-studio/reports/model-acceptance-same-era.json"
       ],
       "status": "pass",
-      "elapsedSeconds": 16,
-      "output": "> basketball-dice-studio@1.0.8 analyze:same-era\n> tsx scripts/analyze-same-era-calibration.ts --pairs-per-season=2 --games-per-pair=60 --seed=6262 --output=/Users/austin/wp/basketball-dice-studio/reports/model-acceptance-same-era.json\n\nPASS: reports/model-acceptance-same-era.json\nMarkdown summary: reports/model-acceptance-same-era.md\nRun: 72 pairs x 60 games, 14s\nsim-exp meanAbs: PTS=1.1832, FGA=0.6689, 3PA=0.4233, FTA=0.6587, TOV=0.3565, ORB=0.3494\nexp-source meanAbs: PTS=2.0179, FGA=1.2608, 3PA=0.6425, FTA=1.2981, TOV=0.6734, ORB=0.8214"
+      "elapsedSeconds": 16.7,
+      "output": "> basketball-dice-studio@1.0.8 analyze:same-era\n> tsx scripts/analyze-same-era-calibration.ts --pairs-per-season=2 --games-per-pair=60 --seed=6262 --output=/Users/austin/wp/basketball-dice-studio/reports/model-acceptance-same-era.json\n\nPASS: reports/model-acceptance-same-era.json\nMarkdown summary: reports/model-acceptance-same-era.md\nRun: 72 pairs x 60 games, 14.1s\nsim-exp meanAbs: PTS=1.1832, FGA=0.6689, 3PA=0.4233, FTA=0.6587, TOV=0.3565, ORB=0.3494\nexp-source meanAbs: PTS=2.0179, FGA=1.2608, 3PA=0.6425, FTA=1.2981, TOV=0.6734, ORB=0.8214"
     },
     {
       "id": "expected-player-lines",
@@ -50,8 +67,25 @@
         "--output=/Users/austin/wp/basketball-dice-studio/reports/model-acceptance-expected-players.json"
       ],
       "status": "pass",
-      "elapsedSeconds": 2,
+      "elapsedSeconds": 1.6,
       "output": "> basketball-dice-studio@1.0.8 validate:expected-players\n> tsx scripts/validate-expected-player-lines.ts --pairs=80 --seed=7373 --output=/Users/austin/wp/basketball-dice-studio/reports/model-acceptance-expected-players.json\n\nPASS: reports/model-acceptance-expected-players.json\nMarkdown summary: reports/model-acceptance-expected-players.md\nPairs: 80, failures=0, elapsed=0.2s"
+    },
+    {
+      "id": "player-sim-convergence",
+      "label": "Player sim convergence",
+      "command": [
+        "npm",
+        "run",
+        "validate:player-convergence",
+        "--",
+        "--pairs-per-bucket=1",
+        "--games-per-pair=120",
+        "--seed=8383",
+        "--output=/Users/austin/wp/basketball-dice-studio/reports/model-acceptance-player-convergence.json"
+      ],
+      "status": "pass",
+      "elapsedSeconds": 8.4,
+      "output": "> basketball-dice-studio@1.0.8 validate:player-convergence\n> tsx scripts/validate-player-sim-convergence.ts --pairs-per-bucket=1 --games-per-pair=120 --seed=8383 --output=/Users/austin/wp/basketball-dice-studio/reports/model-acceptance-player-convergence.json\n\nPASS: reports/model-acceptance-player-convergence.json\nMarkdown summary: reports/model-acceptance-player-convergence.md\nRun: 5 pairs x 120 games x 3 scenarios, 6.5s\nPASS Baseline: pts.meanAbs=0.3895, fga.meanAbs=0.2297, threePa.meanAbs=0.112, fta.meanAbs=0.1759, tov.meanAbs=0.1053, orb.meanAbs=0.0757, ast.meanAbs=0.1198\nPASS Usage + three + foul pressure: pts.meanAbs=0.4331, fga.meanAbs=0.2603, threePa.meanAbs=0.1261, fta.meanAbs=0.1841, tov.meanAbs=0.0982, orb.meanAbs=0.0676, ast.meanAbs=0.1345\nPASS Tempo + boards + ball security: pts.meanAbs=0.4039, fga.meanAbs=0.2583, threePa.meanAbs=0.1255, fta.meanAbs=0.1901, tov.meanAbs=0.0906, orb.meanAbs=0.1052, ast.meanAbs=0.1407"
     },
     {
       "id": "gameplay-lever-smoke",
@@ -67,8 +101,8 @@
         "--output=/Users/austin/wp/basketball-dice-studio/reports/model-acceptance-gameplay-levers.json"
       ],
       "status": "pass",
-      "elapsedSeconds": 28.3,
-      "output": "> basketball-dice-studio@1.0.8 sweep:gameplay-levers\n> tsx scripts/sweep-gameplay-levers.ts --pairs-per-bucket=2 --games-per-scenario=80 --seed=9292 --output=/Users/austin/wp/basketball-dice-studio/reports/model-acceptance-gameplay-levers.json\n\nWrote reports/model-acceptance-gameplay-levers.json\nMarkdown summary: reports/model-acceptance-gameplay-levers.md\nRun: 10 pairs x 80 games x 9 scenarios, 27.1s\nPASS Tempo +10%: metric=poss, expectedDelta=9.1, simDelta=9.1162, meanAbsError=0.1038, directionPass=1\nPASS Tempo -10%: metric=poss, expectedDelta=-9.2, simDelta=-9.1775, meanAbsError=0.1925, directionPass=1\nPASS Usage concentration +25%: metric=topUseShare, expectedDelta=0.0429, simDelta=0.0409, meanAbsError=-, directionPass=1\nPASS Usage concentration -20%: metric=topUseShare, expectedDelta=-0.0328, simDelta=-0.0317, meanAbsError=-, directionPass=1\nPASS 3PA emphasis +6: metric=threePa, expectedDelta=5.1353, simDelta=4.9763, meanAbsError=0.2878, directionPass=1\nPASS 3PA emphasis -6: metric=threePa, expectedDelta=-5.1416, simDelta=-5.035, meanAbsError=0.3235, directionPass=1\nPASS Foul pressure +4: metric=fta, expectedDelta=8.1362, simDelta=7.9425, meanAbsError=0.3676, directionPass=1\nPASS Crash boards +4: metric=orb, expectedDelta=2.0126, simDelta=2.0063, meanAbsError=0.224, directionPass=1\nPASS Ball security +4: metric=tov, expectedDelta=-4.1168, simDelta=-4.435, meanAbsError=0.4656, directionPass=1"
+      "elapsedSeconds": 29.1,
+      "output": "> basketball-dice-studio@1.0.8 sweep:gameplay-levers\n> tsx scripts/sweep-gameplay-levers.ts --pairs-per-bucket=2 --games-per-scenario=80 --seed=9292 --output=/Users/austin/wp/basketball-dice-studio/reports/model-acceptance-gameplay-levers.json\n\nWrote reports/model-acceptance-gameplay-levers.json\nMarkdown summary: reports/model-acceptance-gameplay-levers.md\nRun: 10 pairs x 80 games x 9 scenarios, 27.4s\nPASS Tempo +10%: metric=poss, expectedDelta=9.1, simDelta=9.1162, meanAbsError=0.1038, directionPass=1\nPASS Tempo -10%: metric=poss, expectedDelta=-9.2, simDelta=-9.1775, meanAbsError=0.1925, directionPass=1\nPASS Usage concentration +25%: metric=topUseShare, expectedDelta=0.0429, simDelta=0.0409, meanAbsError=-, directionPass=1\nPASS Usage concentration -20%: metric=topUseShare, expectedDelta=-0.0328, simDelta=-0.0317, meanAbsError=-, directionPass=1\nPASS 3PA emphasis +6: metric=threePa, expectedDelta=5.1353, simDelta=4.9763, meanAbsError=0.2878, directionPass=1\nPASS 3PA emphasis -6: metric=threePa, expectedDelta=-5.1416, simDelta=-5.035, meanAbsError=0.3235, directionPass=1\nPASS Foul pressure +4: metric=fta, expectedDelta=8.1362, simDelta=7.9425, meanAbsError=0.3676, directionPass=1\nPASS Crash boards +4: metric=orb, expectedDelta=2.0126, simDelta=2.0063, meanAbsError=0.224, directionPass=1\nPASS Ball security +4: metric=tov, expectedDelta=-4.1168, simDelta=-4.435, meanAbsError=0.4656, directionPass=1"
     }
   ]
 }
