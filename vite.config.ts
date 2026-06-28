@@ -6,7 +6,7 @@ import { defineConfig, type Plugin, type PreviewServer, type ViteDevServer } fro
 
 const rootDir = dirname(fileURLToPath(import.meta.url));
 const appStateScript = resolve(rootDir, "scripts/app-state-sqlite.py");
-const validStateKeys = new Set(["tournament", "season-league", "season-leagues"]);
+const validStateKeys = new Set(["tournament", "season-league", "season-leagues", "history-replays"]);
 const appStateMaxBuffer = 64 * 1024 * 1024;
 
 function readBody(request: NodeJS.ReadableStream): Promise<string> {

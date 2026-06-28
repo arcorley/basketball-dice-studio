@@ -1,6 +1,7 @@
+import { normalizeHistoryReplayCollection, type HistoryReplayCollectionState } from "./historyReplay";
 import type { LeagueState } from "./types";
 
-type AppStateKey = "tournament" | "season-league" | "season-leagues";
+type AppStateKey = "tournament" | "season-league" | "season-leagues" | "history-replays";
 
 export interface SeasonLeagueCollectionState {
   leagues: LeagueState[];
@@ -114,3 +115,13 @@ export async function saveSeasonLeagues(collection: SeasonLeagueCollectionState)
   await saveStateValue("season-leagues", normalizeSeasonLeagueCollection(collection));
   await saveStateValue("season-league", null);
 }
+
+export async function loadHistoryReplays(): Promise<HistoryReplayCollectionState> {
+  return normalizeHistoryReplayCollection(await loadStateValue("history-replays"));
+}
+
+export async function saveHistoryReplays(collection: HistoryReplayCollectionState): Promise<void> {
+  await saveStateValue("history-replays", normalizeHistoryReplayCollection(collection));
+}
+
+export type { HistoryReplayCollectionState };

@@ -83,12 +83,31 @@ import {
   buildFranchiseContinuitySnapshot,
   buildRosterBuildingBoards,
   recommendSeasonCarryover,
+  type FranchiseDraftProspect,
   type SeasonLeagueSetupRecommendation
 } from "./lib/franchiseMode";
 import { exportGameCardPdf, exportGamePacketPdf, exportPossessionFlowPdf, exportScoresheetsPdf } from "./lib/pdfExport";
 import { formatNumber, formatPct, loadDiceTeam, loadSourceCatalog } from "./lib/sourceData";
 import { generalDerivationNotes, teamDerivationNotes } from "./lib/teamCards";
-import { loadSeasonLeague, loadSeasonLeagueCollection, loadTournament, saveSeasonLeagues, saveTournament, type SeasonLeagueCollectionState } from "./lib/storage";
+import {
+  loadHistoryReplays,
+  loadSeasonLeague,
+  loadSeasonLeagueCollection,
+  loadTournament,
+  saveHistoryReplays,
+  saveSeasonLeagues,
+  saveTournament,
+  type SeasonLeagueCollectionState
+} from "./lib/storage";
+import {
+  emptyHistoryReplayCollection,
+  normalizeHistoryReplayCollection,
+  type HistoryReplayCampaign,
+  type HistoryReplayCollectionState,
+  type HistoryReplayDraftPick,
+  type HistoryReplayProspectSnapshot,
+  type HistoryReplaySeason
+} from "./lib/historyReplay";
 import type {
   DicePlayerCard,
   DiceTeamCard,
@@ -137,6 +156,19 @@ type TeamLeaderSortKey = "team" | "games" | LeaderStatField;
 type PlayerLeaderSortKey = "player" | "team" | "games" | LeaderStatField;
 type ScheduledLeagueGame = LeagueGame & { date: string; sequence: number };
 type StandingRow = ReturnType<typeof standings>[number];
+type HistoryReplayDraftChoice = {
+  prospectId: string;
+  label: string;
+  detail: string;
+  prospectSnapshot: HistoryReplayProspectSnapshot;
+  plan: TeamGamePlanOptions;
+};
+type ActiveHistoryReplay = {
+  campaign: HistoryReplayCampaign;
+  season: HistoryReplaySeason;
+  seasons: HistoryReplaySeason[];
+  draftPicks: HistoryReplayDraftPick[];
+};
 
 const minEraContextSeason = 1990;
 const maxEraContextSeason = 2025;
@@ -844,6 +876,83 @@ function seasonRoster(teams: SourceTeamCatalogEntry[], season: string): SourceTe
     .sort((a, b) => canonicalFranchise(a).localeCompare(canonicalFranchise(b)) || a.shortName.localeCompare(b.shortName));
 }
 
+function teamForReplayFranchise(teams: SourceTeamCatalogEntry[], season: string, franchise: string): SourceTeamCatalogEntry | undefined {
+  return seasonRoster(teams, season).find((team) => canonicalFranchise(team) === franchise);
+}
+
+function nextHistoryReplaySeason(seasonChoices: SeasonChoice[], seasonEndYear: number): SeasonChoice | undefined {
+  return [...seasonChoices].sort((a, b) => a.seasonEndYear - b.seasonEndYear).find((choice) => choice.seasonEndYear > seasonEndYear);
+}
+
+function draftPlanForProspect(prospect: Pick<FranchiseDraftProspect, "needAreas">): TeamGamePlanOptions {
+  const areas = new Set(prospect.needAreas);
+  return {
+    usageConcentration: areas.has("shotCreation") ? 1.1 : areas.has("depth") ? 0.96 : 1,
+    threePointEmphasis: areas.has("spacing") ? 2 : 0,
+    foulPressure: areas.has("rimPressure") ? 2 : 0,
+    crashBoards: areas.has("rebounding") ? 2 : 0,
+    ballSecurity: areas.has("ballSecurity") || areas.has("perimeterDefense") ? 2 : areas.has("shotCreation") ? -1 : 0
+  };
+}
+
+function replayIdSegment(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "replay";
+}
+
+function createReplayRecordId(prefix: string): string {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function prospectSnapshotForDraft(prospect: FranchiseDraftProspect): HistoryReplayProspectSnapshot {
+  return {
+    prospectId: prospect.prospectId,
+    archetype: prospect.archetype,
+    position: prospect.position,
+    rank: prospect.rank,
+    projectedPickBand: prospect.projectedPickBand,
+    needAreas: [...prospect.needAreas],
+    upside: prospect.upside,
+    readiness: prospect.readiness,
+    risk: prospect.risk
+  };
+}
+
+function historyReplayForLeague(collection: HistoryReplayCollectionState, leagueId: string): ActiveHistoryReplay | null {
+  const season = collection.seasons.find((row) => row.leagueId === leagueId);
+  if (!season) return null;
+  const campaign = collection.campaigns.find((row) => row.id === season.campaignId);
+  if (!campaign) return null;
+  const seasons = collection.seasons.filter((row) => row.campaignId === campaign.id).sort((a, b) => a.seasonIndex - b.seasonIndex || a.seasonEndYear - b.seasonEndYear);
+  const draftPicks = collection.draftPicks.filter((row) => row.campaignId === campaign.id).sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
+  return { campaign, season, seasons, draftPicks };
+}
+
+function removeLeagueFromHistoryReplays(collection: HistoryReplayCollectionState, leagueId: string): HistoryReplayCollectionState {
+  const now = new Date().toISOString();
+  const seasons = collection.seasons.filter((season) => season.leagueId !== leagueId);
+  const seasonIds = new Set(seasons.map((season) => season.id));
+  const leagueIds = new Set(seasons.map((season) => season.leagueId));
+  const draftPicks = collection.draftPicks.filter(
+    (pick) => seasonIds.has(pick.fromSeasonId) && seasonIds.has(pick.toSeasonId) && leagueIds.has(pick.fromLeagueId) && leagueIds.has(pick.toLeagueId)
+  );
+  const campaigns = collection.campaigns
+    .map((campaign) => {
+      const campaignSeasons = seasons.filter((season) => season.campaignId === campaign.id).sort((a, b) => a.seasonEndYear - b.seasonEndYear || a.seasonIndex - b.seasonIndex);
+      const latest = campaignSeasons.at(-1);
+      if (!latest) return null;
+      return {
+        ...campaign,
+        currentSeason: latest.season,
+        currentSeasonEndYear: latest.seasonEndYear,
+        currentTeamId: latest.teamId,
+        activeLeagueId: latest.leagueId,
+        updatedAt: campaign.activeLeagueId === leagueId ? now : campaign.updatedAt
+      };
+    })
+    .filter((campaign): campaign is HistoryReplayCampaign => Boolean(campaign));
+  return normalizeHistoryReplayCollection({ campaigns, seasons, draftPicks });
+}
+
 function bestByCanonicalFranchise(teams: SourceTeamCatalogEntry[], championshipFirst: boolean): SourceTeamCatalogEntry[] {
   const grouped = new Map<string, SourceTeamCatalogEntry[]>();
   for (const team of teams) {
@@ -1439,8 +1548,11 @@ function StudioApp({ catalog }: { catalog: SourceCatalog }) {
   const [selectedTeamId, setSelectedTeamId] = useState(defaultAwayId);
   const [tournament, setTournamentState] = useState<LeagueState | null>(null);
   const [seasonLeagueCollection, setSeasonLeagueCollectionState] = useState<SeasonLeagueCollectionState>({ leagues: [], activeLeagueId: null });
+  const [historyReplayCollection, setHistoryReplayCollectionState] = useState<HistoryReplayCollectionState>(emptyHistoryReplayCollection);
   const [seasonLeagueStorageReady, setSeasonLeagueStorageReady] = useState(false);
+  const [historyReplayStorageReady, setHistoryReplayStorageReady] = useState(false);
   const [seasonLeagueDirtyRevision, setSeasonLeagueDirtyRevision] = useState(0);
+  const [historyReplayDirtyRevision, setHistoryReplayDirtyRevision] = useState(0);
   const [teamCards, setTeamCards] = useState<Partial<Record<string, DiceTeamCard>>>({});
   const [teamLoadError, setTeamLoadError] = useState<string | null>(null);
   const [matchupOptions, setMatchupOptions] = useState<MatchupOptions>(defaultMatchupOptions);
@@ -1452,8 +1564,9 @@ function StudioApp({ catalog }: { catalog: SourceCatalog }) {
     setAppStateLoading(true);
     setAppStateError(null);
     setSeasonLeagueStorageReady(false);
-    Promise.all([loadTournament(), loadSeasonLeagueCollection(), loadSeasonLeague()])
-      .then(([savedTournament, savedSeasonLeagueCollection, legacySeasonLeague]) => {
+    setHistoryReplayStorageReady(false);
+    Promise.all([loadTournament(), loadSeasonLeagueCollection(), loadSeasonLeague(), loadHistoryReplays()])
+      .then(([savedTournament, savedSeasonLeagueCollection, legacySeasonLeague, savedHistoryReplays]) => {
         if (!active) return;
         setTournamentState(savedTournament);
         const { collection: savedSeasonLeagues, hasStoredCollection } = savedSeasonLeagueCollection;
@@ -1467,8 +1580,11 @@ function StudioApp({ catalog }: { catalog: SourceCatalog }) {
           leagues[0]?.id ||
           null;
         setSeasonLeagueCollectionState({ leagues, activeLeagueId });
+        setHistoryReplayCollectionState(normalizeHistoryReplayCollection(savedHistoryReplays));
         setSeasonLeagueDirtyRevision(!hasStoredCollection && legacySeasonLeague ? 1 : 0);
+        setHistoryReplayDirtyRevision(0);
         setSeasonLeagueStorageReady(true);
+        setHistoryReplayStorageReady(true);
       })
       .catch((reason: unknown) => {
         if (active) setAppStateError(reason instanceof Error ? reason.message : String(reason));
@@ -1488,6 +1604,14 @@ function StudioApp({ catalog }: { catalog: SourceCatalog }) {
       setAppStateError(reason instanceof Error ? reason.message : String(reason));
     });
   }, [seasonLeagueCollection, seasonLeagueDirtyRevision, seasonLeagueStorageReady]);
+
+  useEffect(() => {
+    if (!historyReplayStorageReady || historyReplayDirtyRevision === 0) return;
+    setAppStateError(null);
+    void saveHistoryReplays(historyReplayCollection).catch((reason: unknown) => {
+      setAppStateError(reason instanceof Error ? reason.message : String(reason));
+    });
+  }, [historyReplayCollection, historyReplayDirtyRevision, historyReplayStorageReady]);
 
   const setTournament = useCallback((next: LeagueState | null) => {
     setTournamentState(next);
@@ -1516,6 +1640,11 @@ function StudioApp({ catalog }: { catalog: SourceCatalog }) {
     setSeasonLeagueDirtyRevision((current) => current + 1);
   }, []);
 
+  const updateHistoryReplayCollection = useCallback((updater: (current: HistoryReplayCollectionState) => HistoryReplayCollectionState) => {
+    setHistoryReplayCollectionState((current) => normalizeHistoryReplayCollection(updater(current)));
+    setHistoryReplayDirtyRevision((current) => current + 1);
+  }, []);
+
   const deleteSeasonLeague = useCallback((leagueId: string) => {
     setSeasonLeagueCollectionState((current) => {
       const leagues = current.leagues.filter((league) => league.id !== leagueId);
@@ -1524,7 +1653,9 @@ function StudioApp({ catalog }: { catalog: SourceCatalog }) {
         activeLeagueId: current.activeLeagueId === leagueId ? leagues[0]?.id ?? null : current.activeLeagueId
       };
     });
+    setHistoryReplayCollectionState((current) => removeLeagueFromHistoryReplays(current, leagueId));
     setSeasonLeagueDirtyRevision((current) => current + 1);
+    setHistoryReplayDirtyRevision((current) => current + 1);
   }, []);
 
   const loadTeam = useCallback(
@@ -1736,6 +1867,8 @@ function StudioApp({ catalog }: { catalog: SourceCatalog }) {
                 setActiveLeagueId={setActiveSeasonLeagueId}
                 setLeague={upsertSeasonLeague}
                 deleteLeague={deleteSeasonLeague}
+                historyReplays={historyReplayCollection}
+                updateHistoryReplays={updateHistoryReplayCollection}
                 seasonChoices={seasonChoices}
                 defaultSeason={defaultSeason}
                 sourceTeams={sourceTeams}
@@ -4485,6 +4618,8 @@ function SeasonLeagueView({
   setActiveLeagueId,
   setLeague,
   deleteLeague,
+  historyReplays,
+  updateHistoryReplays,
   seasonChoices,
   defaultSeason,
   sourceTeams,
@@ -4497,15 +4632,20 @@ function SeasonLeagueView({
   setActiveLeagueId: (leagueId: string) => void;
   setLeague: (league: LeagueState) => void;
   deleteLeague: (leagueId: string) => void;
+  historyReplays: HistoryReplayCollectionState;
+  updateHistoryReplays: (updater: (current: HistoryReplayCollectionState) => HistoryReplayCollectionState) => void;
   seasonChoices: SeasonChoice[];
   defaultSeason: string;
   sourceTeams: SourceTeamCatalogEntry[];
   teamNames: Map<string, string>;
   loadTeam: (teamId: string) => Promise<DiceTeamCard>;
 }) {
+  const historyReplayDefaultSeason = seasonChoices.at(-1)?.season ?? defaultSeason;
   const [name, setName] = useState("NBA Season");
   const [season, setSeason] = useState(defaultSeason);
+  const [historyReplaySeason, setHistoryReplaySeason] = useState(historyReplayDefaultSeason);
   const [selected, setSelected] = useState<string[]>(() => seasonRoster(sourceTeams, defaultSeason).slice(0, maxLeagueTeams).map((team) => team.id));
+  const [historyReplayTeamId, setHistoryReplayTeamId] = useState(() => seasonRoster(sourceTeams, historyReplayDefaultSeason)[0]?.id ?? "");
   const [activeSlot, setActiveSlot] = useState(0);
   const [replaceQuery, setReplaceQuery] = useState("");
   const [replaceSeason, setReplaceSeason] = useState(allSeasonsValue);
@@ -4529,6 +4669,10 @@ function SeasonLeagueView({
   const commitLeague = useCallback((nextLeague: LeagueState) => setLeague(syncLeaguePlayoffs(nextLeague)), [setLeague]);
   const selectedEntries = selected.map((teamId) => sourceTeamsById.get(teamId)).filter((team): team is SourceTeamCatalogEntry => Boolean(team));
   const leagueTeamEntries = (league?.teamIds ?? []).map((teamId) => sourceTeamsById.get(teamId)).filter((team): team is SourceTeamCatalogEntry => Boolean(team));
+  const historyReplaySeasonTeams = useMemo(() => seasonRoster(sourceTeams, historyReplaySeason).slice(0, maxLeagueTeams), [historyReplaySeason, sourceTeams]);
+  const historyReplayStartChoice = seasonChoices.find((choice) => choice.season === historyReplaySeason) ?? seasonChoices[0];
+  const historyReplayStartTeam = historyReplaySeasonTeams.find((team) => team.id === historyReplayTeamId);
+  const activeHistoryReplay = useMemo(() => (league ? historyReplayForLeague(historyReplays, league.id) : null), [historyReplays, league]);
   const leagueTeamKey = league?.teamIds.join("|") ?? "";
   const replacementTeams = useMemo(
     () => filterCatalogTeams(sourceTeams, { season: replaceSeason, query: replaceQuery, franchise: replaceFranchise }).slice(0, maxTeamPickerResults),
@@ -4606,6 +4750,13 @@ function SeasonLeagueView({
   useEffect(() => {
     setActiveSlot((current) => Math.min(current, Math.max(0, selected.length - 1)));
   }, [selected.length]);
+
+  useEffect(() => {
+    setHistoryReplayTeamId((current) => {
+      if (historyReplaySeasonTeams.some((team) => team.id === current)) return current;
+      return historyReplaySeasonTeams[0]?.id ?? "";
+    });
+  }, [historyReplaySeasonTeams]);
 
   useEffect(() => {
     if (!league) setSection("hq");
@@ -4896,6 +5047,66 @@ function SeasonLeagueView({
     cancelLeagueRename();
   };
 
+  const createHistoryReplayLeague = () => {
+    if (!historyReplayStartChoice || !historyReplayStartTeam || !historyReplaySeasonTeams.length) {
+      setLeagueError("Choose a start season and team for history replay.");
+      return;
+    }
+    const leagueName = `${canonicalFranchise(historyReplayStartTeam)} History Replay (${historyReplayStartChoice.season})`;
+    const nextLeague = createSeasonLeague(
+      leagueName,
+      historyReplaySeasonTeams.map((team) => team.id),
+      82,
+      seasonStartDateForTeams(historyReplaySeasonTeams)
+    );
+    const replayLeague = {
+      ...nextLeague,
+      focusTeamId: historyReplayStartTeam.id
+    };
+    const campaignId = createReplayRecordId(`history-replay-${replayIdSegment(canonicalFranchise(historyReplayStartTeam))}-${historyReplayStartChoice.seasonEndYear}`);
+    const seasonRecordId = `${campaignId}-season-${historyReplayStartChoice.seasonEndYear}-${replayIdSegment(replayLeague.id)}`;
+    const campaign: HistoryReplayCampaign = {
+      id: campaignId,
+      name: leagueName,
+      controlledFranchise: canonicalFranchise(historyReplayStartTeam),
+      startSeason: historyReplayStartChoice.season,
+      startSeasonEndYear: historyReplayStartChoice.seasonEndYear,
+      currentSeason: historyReplayStartChoice.season,
+      currentSeasonEndYear: historyReplayStartChoice.seasonEndYear,
+      originalTeamId: historyReplayStartTeam.id,
+      currentTeamId: historyReplayStartTeam.id,
+      activeLeagueId: replayLeague.id,
+      createdAt: replayLeague.createdAt,
+      updatedAt: replayLeague.updatedAt
+    };
+    const firstSeason: HistoryReplaySeason = {
+      id: seasonRecordId,
+      campaignId,
+      leagueId: replayLeague.id,
+      season: historyReplayStartChoice.season,
+      seasonEndYear: historyReplayStartChoice.seasonEndYear,
+      teamId: historyReplayStartTeam.id,
+      seasonIndex: 0,
+      createdAt: replayLeague.createdAt
+    };
+    setLeague(replayLeague);
+    updateHistoryReplays((current) =>
+      normalizeHistoryReplayCollection({
+        campaigns: [campaign, ...current.campaigns],
+        seasons: [firstSeason, ...current.seasons],
+        draftPicks: current.draftPicks
+      })
+    );
+    setMode("play");
+    setSection("hq");
+    setLeagueError(null);
+    setBatchRequest(null);
+    setManualGame(null);
+    setWatchGame(null);
+    setInfoGame(null);
+    cancelLeagueRename();
+  };
+
   const createCarryoverLeague = (setup: SeasonLeagueSetupRecommendation) => {
     const teamIds = setup.teamIds.filter((teamId, index) => setup.teamIds.indexOf(teamId) === index && sourceTeamsById.has(teamId));
     if (teamIds.length < 2) {
@@ -4914,6 +5125,102 @@ function SeasonLeagueView({
       focusTeamId: fallbackFocusTeamId,
       matchupOptions: setup.matchupOptions ?? nextLeague.matchupOptions
     });
+    setMode("play");
+    setSection("hq");
+    setLeagueError(null);
+    setBatchRequest(null);
+    setManualGame(null);
+    setWatchGame(null);
+    setInfoGame(null);
+    cancelLeagueRename();
+  };
+
+  const createHistoryReplaySeason = (choice: HistoryReplayDraftChoice) => {
+    if (!league || !activeHistoryReplay) return;
+    const { campaign, season: fromSeason, seasons: replaySeasons } = activeHistoryReplay;
+    if (campaign.activeLeagueId !== league.id) {
+      setLeagueError("Open the latest replay season before running the next offseason draft.");
+      return;
+    }
+    if (!postseasonComplete) {
+      setLeagueError("History replay draft unlocks after the playoff bracket is complete.");
+      return;
+    }
+
+    const nextSeason = nextHistoryReplaySeason(seasonChoices, campaign.currentSeasonEndYear);
+    if (!nextSeason) {
+      setLeagueError("No later historical season is available in the catalog.");
+      return;
+    }
+
+    const nextTeams = seasonRoster(sourceTeams, nextSeason.season).slice(0, maxLeagueTeams);
+    const controlledTeam = teamForReplayFranchise(sourceTeams, nextSeason.season, campaign.controlledFranchise);
+    if (!controlledTeam || !nextTeams.some((team) => team.id === controlledTeam.id)) {
+      setLeagueError(`${campaign.controlledFranchise} is not available in ${nextSeason.season}.`);
+      return;
+    }
+
+    const nextLeague = createSeasonLeague(
+      `${campaign.controlledFranchise} History Replay (${nextSeason.season})`,
+      nextTeams.map((team) => team.id),
+      82,
+      seasonStartDateForTeams(nextTeams)
+    );
+    const replayLeague = {
+      ...nextLeague,
+      focusTeamId: controlledTeam.id,
+      matchupOptions: setTeamPlanForMatchupOptions(defaultLeagueMatchupOptions(nextLeague), controlledTeam.id, choice.plan)
+    };
+    const now = new Date().toISOString();
+    const toSeason: HistoryReplaySeason = {
+      id: `${campaign.id}-season-${nextSeason.seasonEndYear}-${replayIdSegment(replayLeague.id)}`,
+      campaignId: campaign.id,
+      leagueId: replayLeague.id,
+      season: nextSeason.season,
+      seasonEndYear: nextSeason.seasonEndYear,
+      teamId: controlledTeam.id,
+      seasonIndex: replaySeasons.length,
+      createdAt: replayLeague.createdAt
+    };
+    const draftPick: HistoryReplayDraftPick = {
+      id: `${campaign.id}-pick-${nextSeason.seasonEndYear}-${replayIdSegment(choice.prospectId)}-${Date.now()}`,
+      campaignId: campaign.id,
+      fromSeasonId: fromSeason.id,
+      toSeasonId: toSeason.id,
+      fromLeagueId: league.id,
+      toLeagueId: replayLeague.id,
+      season: nextSeason.season,
+      seasonEndYear: nextSeason.seasonEndYear,
+      pickId: choice.prospectId,
+      pickLabel: choice.label,
+      pickDetail: choice.detail,
+      pickKind: "archetype",
+      prospectSnapshot: choice.prospectSnapshot,
+      controlledTeamId: controlledTeam.id,
+      controlledTeamName: controlledTeam.shortName,
+      plan: choice.plan,
+      createdAt: now
+    };
+    setLeague(replayLeague);
+    updateHistoryReplays((current) =>
+      normalizeHistoryReplayCollection({
+        campaigns: current.campaigns.map((row) =>
+          row.id === campaign.id
+            ? {
+                ...row,
+                name: campaign.name,
+                currentSeason: nextSeason.season,
+                currentSeasonEndYear: nextSeason.seasonEndYear,
+                currentTeamId: controlledTeam.id,
+                activeLeagueId: replayLeague.id,
+                updatedAt: now
+              }
+            : row
+        ),
+        seasons: [...current.seasons, toSeason],
+        draftPicks: [...current.draftPicks, draftPick]
+      })
+    );
     setMode("play");
     setSection("hq");
     setLeagueError(null);
@@ -5100,6 +5407,51 @@ function SeasonLeagueView({
                 Best Record
               </Button>
             </div>
+            <section className="history-replay-builder">
+              <header>
+                <div>
+                  <span>Variant</span>
+                  <strong>History Replay</strong>
+                </div>
+                <span className="badge">Offseason draft</span>
+              </header>
+              <div className="form-row">
+                <label>
+                  Start season
+                  <select value={historyReplaySeason} onChange={(event) => setHistoryReplaySeason(event.target.value)}>
+                    {seasonChoices.map((choice) => (
+                      <option key={choice.season} value={choice.season}>
+                        {choice.season}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Control team
+                  <select value={historyReplayTeamId} onChange={(event) => setHistoryReplayTeamId(event.target.value)}>
+                    {historyReplaySeasonTeams.map((team) => (
+                      <option key={team.id} value={team.id}>
+                        {team.shortName} · {recordLabel(team)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <div className="history-replay-preview">
+                {historyReplayStartTeam && <TeamLogo team={historyReplayStartTeam} className="team-logo-check" />}
+                <span>
+                  <strong>{historyReplayStartTeam ? canonicalFranchise(historyReplayStartTeam) : "Choose team"}</strong>
+                  <small>
+                    {historyReplayStartChoice
+                      ? `${historyReplayStartChoice.season} start · ${historyReplaySeasonTeams.length.toLocaleString()} catalog teams`
+                      : "Choose a start season"}
+                  </small>
+                </span>
+                <Button icon={<Archive size={16} />} variant="primary" disabled={!historyReplayStartTeam || !historyReplayStartChoice} onClick={createHistoryReplayLeague}>
+                  Start Replay
+                </Button>
+              </div>
+            </section>
             <div className="season-summary-row">
               <span className="badge">{selectedEntries.length} teams</span>
               <span>{selectedEntries.length >= 2 ? `${selectedEntries.length * 82 / 2} scheduled games` : "Add at least two teams"}</span>
@@ -5654,6 +6006,9 @@ function SeasonLeagueView({
               onApplyTeamPlan={applyTeamCoachPlan}
               onOpenGame={setInfoGame}
               onCreateCarryoverLeague={createCarryoverLeague}
+              onCreateHistoryReplaySeason={createHistoryReplaySeason}
+              historyReplay={activeHistoryReplay}
+              historyReplayOffseasonReady={postseasonComplete || league.playoffs?.status === "complete"}
             />
           )}
           {manualGame && (
@@ -6049,7 +6404,10 @@ function LeagueGameSystemsView({
   onTeamChange,
   onApplyTeamPlan,
   onOpenGame,
-  onCreateCarryoverLeague
+  onCreateCarryoverLeague,
+  onCreateHistoryReplaySeason,
+  historyReplay,
+  historyReplayOffseasonReady
 }: {
   league: LeagueState;
   leagues: LeagueState[];
@@ -6064,6 +6422,9 @@ function LeagueGameSystemsView({
   onApplyTeamPlan: (teamId: string, plan: TeamGamePlanOptions) => void;
   onOpenGame: (game: ScheduledLeagueGame) => void;
   onCreateCarryoverLeague: (setup: SeasonLeagueSetupRecommendation) => void;
+  onCreateHistoryReplaySeason: (choice: HistoryReplayDraftChoice) => void;
+  historyReplay: ActiveHistoryReplay | null;
+  historyReplayOffseasonReady: boolean;
 }) {
   const scheduledById = useMemo(() => new Map(scheduledGames.map((game) => [game.id, game])), [scheduledGames]);
   const focusedTeamId = focusTeamId !== allTeamsValue && league.teamIds.includes(focusTeamId) ? focusTeamId : league.teamIds[0] ?? "";
@@ -6137,6 +6498,25 @@ function LeagueGameSystemsView({
         maxTradePlayersPerTeam: 4
       }),
     [candidateTeamCards, focusedTeamId, league, leagueTeamCards, teamNames]
+  );
+  const replaySeasonChoices = useMemo(() => seasonChoicesFor(sourceTeams), [sourceTeams]);
+  const nextReplaySeason = historyReplay ? nextHistoryReplaySeason(replaySeasonChoices, historyReplay.campaign.currentSeasonEndYear) : undefined;
+  const nextReplayTeam =
+    historyReplay && nextReplaySeason ? teamForReplayFranchise(sourceTeams, nextReplaySeason.season, historyReplay.campaign.controlledFranchise) : undefined;
+  const historyReplayAdvanceReady = Boolean(historyReplayOffseasonReady && historyReplay?.campaign.activeLeagueId === league.id && nextReplaySeason && nextReplayTeam);
+  const historyReplayDraftChoices = useMemo(
+    () =>
+      rosterBoards.draftBoard.slice(0, 3).map((prospect) => ({
+        prospect,
+        choice: {
+          prospectId: prospect.prospectId,
+          label: prospect.archetype,
+          detail: prospect.summary,
+          prospectSnapshot: prospectSnapshotForDraft(prospect),
+          plan: draftPlanForProspect(prospect)
+        }
+      })),
+    [rosterBoards.draftBoard]
   );
   const coachProfiles = useMemo(() => deriveLeagueCoachProgressionProfiles(league, { teamNames }), [league, teamNames]);
   const visibleCoachProfiles = useMemo(() => {
@@ -6316,6 +6696,39 @@ function LeagueGameSystemsView({
               Create Next Season
             </Button>
           </section>
+          {historyReplay && (
+            <section className="franchise-continuity-card history-replay-card">
+              <span>History replay draft</span>
+              <strong>{historyReplay.campaign.controlledFranchise}</strong>
+              <p>
+                {historyReplay.campaign.currentSeason} complete · next board{" "}
+                {nextReplaySeason && nextReplayTeam ? `${nextReplaySeason.season} ${nextReplayTeam.shortName}` : "not available"}
+              </p>
+              <div className="league-world-chip-row">
+                <span className="league-world-chip">{historyReplay.draftPicks.length.toLocaleString()} picks logged</span>
+                <span className="league-world-chip">{historyReplay.campaign.activeLeagueId === league.id ? "active season" : "archived season"}</span>
+                <span className="league-world-chip">{historyReplayOffseasonReady ? "offseason open" : "finish playoffs"}</span>
+              </div>
+              <div className="history-draft-list">
+                {historyReplayDraftChoices.map(({ prospect, choice }) => (
+                  <span key={prospect.prospectId} className="history-draft-row">
+                    <span>
+                      Draft #{prospect.rank} · {prospect.projectedPickBand}
+                    </span>
+                    <strong>{prospect.archetype}</strong>
+                    <small>{prospect.position} · upside {prospect.upside} · risk {prospect.risk}</small>
+                    <Button
+                      icon={<Archive size={14} />}
+                      disabled={!historyReplayAdvanceReady}
+                      onClick={() => onCreateHistoryReplaySeason(choice)}
+                    >
+                      Draft and Advance
+                    </Button>
+                  </span>
+                ))}
+              </div>
+            </section>
+          )}
           <section className="dynasty-card">
             <span>Dynasty table</span>
             <strong>{continuity.dynastyTable[0]?.displayName ?? "No dynasty leader yet"}</strong>

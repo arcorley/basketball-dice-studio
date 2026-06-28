@@ -4561,6 +4561,37 @@ button.power-ranking-card:focus-visible {
   border-left: 3px solid var(--green);
 }
 
+.history-replay-card {
+  border-left-color: var(--teal);
+}
+
+.history-draft-list {
+  display: grid;
+  gap: 8px;
+}
+
+.history-draft-row {
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.72);
+  display: grid;
+  grid-template-columns: minmax(0, 0.7fr) minmax(0, 1fr) minmax(0, 0.9fr) auto;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  padding: 8px;
+}
+
+.history-draft-row strong,
+.history-draft-row small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-draft-row small {
+  color: var(--muted);
+}
+
 .roster-building-card,
 .offseason-card {
   border-left: 3px solid var(--teal);
@@ -4849,6 +4880,65 @@ button.power-ranking-card:focus-visible {
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
+}
+
+.history-replay-builder {
+  border: 1px solid #d6e2dc;
+  border-left: 4px solid var(--teal);
+  border-radius: 8px;
+  background: #f8faf8;
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+}
+
+.history-replay-builder header,
+.history-replay-preview {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.history-replay-builder header {
+  justify-content: space-between;
+}
+
+.history-replay-builder header > div,
+.history-replay-preview span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.history-replay-builder header span:first-child,
+.history-draft-row > span:first-child {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.history-replay-preview {
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 8px;
+}
+
+.history-replay-preview span {
+  flex: 1 1 auto;
+}
+
+.history-replay-preview strong,
+.history-replay-preview small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-replay-preview small {
+  color: var(--muted);
 }
 
 .season-summary-row {
@@ -7009,6 +7099,7 @@ button.power-ranking-card:focus-visible {
   .media-world-card header,
   .power-ranking-card header,
   .franchise-timeline-row,
+  .history-draft-row,
   .dynasty-milestone-row,
   .roster-hook-row,
   .offseason-hook-row,
